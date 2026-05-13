@@ -62,6 +62,8 @@ function handleClientMessage(message, clientId, connManager) {
  */
 function handleWorkerMessage(message, connManager) {
   const { id, type, payload, push } = message;
+  // 保留 worker 返回的 ok 状态，默认为 true
+  const ok = message.ok !== false;
 
   if (push) {
     // 推送消息 → 广播给所有 client
@@ -78,7 +80,7 @@ function handleWorkerMessage(message, connManager) {
 
   // 写操作完成时更新日志
   if (pending.type === 'file_write') {
-    addLogEntry('file_write', pending.clientId, payload?.path || '?', payload?.ok ? 'ok' : 'failed');
+    addLogEntry('file_write', pending.clientId, payload?.path || '?', ok && payload?.ok ? 'ok' : 'failed');
   }
 
   const clientWs = connManager.clients.get(pending.clientId);
@@ -86,7 +88,7 @@ function handleWorkerMessage(message, connManager) {
     return; // client 已断开
   }
 
-  clientWs.send(JSON.stringify({ id, ok: true, type, payload }));
+  clientWs.send(JSON.stringify({ id, ok, type, payload }));
 }
 
 function sendError(ws, id, error) {

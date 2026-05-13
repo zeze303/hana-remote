@@ -377,6 +377,15 @@ html, body {
   border-bottom-left-radius: 2px;
 }
 
+.chat-msg.hanako.error {
+  align-self: center;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  max-width: 100%;
+}
+
 .chat-msg.hanako p { margin: 4px 0; }
 .chat-msg.hanako code {
   background: var(--bg);

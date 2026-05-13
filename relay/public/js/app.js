@@ -675,7 +675,19 @@
     if (msg.id !== chatMsgId) return;
     const p = msg.payload || {};
 
+    // 错误处理
+    if (!msg.ok || p.error) {
+      addChatMsg('hanako error', '⚠️ ' + (p.error || '请求失败'));
+      chatMsgId = null;
+      chatInput.disabled = false;
+      chatSendBtn.disabled = !state.workerOnline;
+      return;
+    }
+
     if (p.done) {
+      // 标记最后一条消息已完成
+      const lastMsg = chatMessages.querySelector('.chat-msg.hanako:last-child');
+      if (lastMsg) lastMsg.dataset.done = 'true';
       chatMsgId = null;
       chatInput.disabled = false;
       chatSendBtn.disabled = !state.workerOnline;

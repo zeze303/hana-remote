@@ -942,6 +942,9 @@
       state._lastWasCompact = false;
     }
 
+    // 发送前刷新一次统计（先更新用户消息后的状态）
+    setTimeout(requestSessionStats, 300);
+
     // 显示用户消息
     addChatMsg('user', text);
     chatMsgId = sendMsg('chat', { text });
@@ -1127,6 +1130,9 @@
     if (!state.activeSessionId) return;
     sendMsg('session_stats', {});
   }
+
+  // 每 30 秒自动刷新一次上下文统计
+  setInterval(requestSessionStats, 30000);
 
   function updateSessionStats(payload) {
     if (!sessionStats) return;

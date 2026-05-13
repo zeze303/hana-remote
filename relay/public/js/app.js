@@ -109,7 +109,14 @@
 
     // 文件树回复
     if (msg.type === 'file_tree' && msg.ok) {
-      renderTreeChildren(msg.payload);
+      if (treeMsgCallback && treeMsgCallback.path === '') {
+        // 根目录（盘符列表）→ 直接渲染
+        renderTree(msg.payload.children || []);
+        treeMsgCallback = null;
+      } else {
+        // 子目录 → 渲染到对应容器
+        renderTreeChildren(msg.payload);
+      }
       return;
     }
 

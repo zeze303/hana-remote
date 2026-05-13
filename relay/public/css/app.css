@@ -191,15 +191,11 @@ html, body {
   position: relative;
 }
 
-/* 竖线：每个子容器左侧画竖线 */
-.tree-children.open {
-  position: relative;
-}
-
-.tree-children.open::before {
+/* 子容器竖线，位置由 --guide-left 控制 */
+.tree-children[data-guide]::before {
   content: '';
   position: absolute;
-  left: 7px;
+  left: var(--guide-left);
   top: 0;
   bottom: 0;
   width: 1px;
@@ -207,33 +203,28 @@ html, body {
   pointer-events: none;
 }
 
-/* 横线：每个子节点左侧画短横 */
-.tree-children.open > div > .tree-node::after {
+/* 每个子节点的横线，位置由 --branch-left 控制 */
+.tree-node[data-branch]::after {
   content: '';
   position: absolute;
-  left: 7px;
+  left: var(--branch-left);
   top: 50%;
-  width: 9px;
   height: 1px;
+  width: 9px;
   background: var(--border-light);
   pointer-events: none;
 }
 
-/* 最后一条子项：竖线只画上半段 */
-.tree-children.open > div:last-child::before {
+/* 最后一项竖线只画一半 */
+.tree-children[data-guide] > div:last-child::before {
   content: '';
   position: absolute;
-  left: 7px;
+  left: var(--guide-left);
   top: 0;
   width: 1px;
   height: 50%;
   background: var(--border-light);
   pointer-events: none;
-}
-
-/* 已有 .tree-children::before 时最后一项不重复 */
-.tree-children.open > div:last-child::before {
-  z-index: 1;
 }
 
 .tree-node .chevron {
@@ -264,7 +255,8 @@ html, body {
 }
 
 .tree-children { display: none; }
-.tree-children.open { display: block; }
+.tree-children.open { display: block; position: relative; }
+.tree-children > div { position: relative; }
 
 /* ── 右侧 ── */
 #content {

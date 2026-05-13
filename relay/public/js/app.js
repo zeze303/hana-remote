@@ -241,6 +241,14 @@
       const node = createTreeNode(child, payload.path || '', parentLevel + 1);
       container.appendChild(node);
     });
+
+    // 设置引导线位置
+    const guideLeft = (12 + parentLevel * 18) + 'px';
+    container.dataset.guide = guideLeft;
+    container.style.setProperty('--guide-left', guideLeft);
+    container.querySelectorAll('[data-branch]').forEach(el => {
+      el.style.setProperty('--branch-left', guideLeft);
+    });
   }
 
   function createTreeNode(item, parentPath, level) {
@@ -255,6 +263,7 @@
       label.className = 'tree-node';
       label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
+      if (level > 0) label.dataset.branch = '';
 
       const chevron = document.createElement('span');
       chevron.className = 'chevron empty';
@@ -301,6 +310,7 @@
       label.className = 'tree-node';
       label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
+      if (level > 0) label.dataset.branch = '';
 
       const chevron = document.createElement('span');
       chevron.className = 'chevron empty';

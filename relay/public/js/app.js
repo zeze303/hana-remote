@@ -243,7 +243,7 @@
     });
 
     // 设置引导线位置
-    const guideLeft = (12 + parentLevel * 18) + 'px';
+    const guideLeft = (20 + parentLevel * 18) + 'px';
     container.dataset.guide = guideLeft;
     container.style.setProperty('--guide-left', guideLeft);
     container.querySelectorAll('[data-branch]').forEach(el => {

@@ -3,6 +3,7 @@
 
 const WsClient = require('./ws-client');
 const { handleFileTree, handleFileRead, handleFileWrite, handleFileStat, handleFileSearch } = require('./handlers/files');
+const { handleClipboardSet, handleClipboardGet } = require('./handlers/clipboard');
 const { createChatHandler } = require('./handlers/chat');
 
 class HanaRemotePlugin {
@@ -113,6 +114,25 @@ class HanaRemotePlugin {
 
       case 'file_search':
         handleFileSearch(payload)
+          .then(result => this.wsClient.send({ id, ok: true, type, payload: result }))
+          .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
+        break;
+
+      // 剪贴板
+      case 'clipboard_set':
+        handleClipboardSet(payload)
+          .then(result => {
+            if (result.error) {
+              this.wsClient.send({ id, ok: false, type, payload: result });
+            } else {
+              this.wsClient.send({ id, ok: true, type, payload: result });
+            }
+          })
+          .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
+        break;
+
+      case 'clipboard_get':
+        handleClipboardGet()
           .then(result => this.wsClient.send({ id, ok: true, type, payload: result }))
           .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
         break;

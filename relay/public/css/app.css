@@ -569,6 +569,22 @@ html, body {
 .file-editor-header .save-btn.show { display: block; }
 .file-editor-header .save-btn:hover { background: var(--accent-hover); }
 
+.file-editor-header .clip-btn,
+.file-editor-header .paste-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-dim); cursor: pointer;
+  font-size: 14px; padding: 2px 8px;
+  border-radius: 4px;
+  transition: 0.15s;
+  line-height: 1.4;
+}
+.file-editor-header .clip-btn:hover,
+.file-editor-header .paste-btn:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 .monaco-container {
   flex: 1;
   min-height: 0;

@@ -40,6 +40,11 @@
   let searchMsgId = null;
   let searchActive = false;
 
+  // ── 剪贴板状态 ──
+  let clipboardSetMsgId = null;
+  let clipboardGetMsgId = null;
+  let clipboardGetTabId = null;
+
   // ========================================
   //  WebSocket 连接
   // ========================================
@@ -156,6 +161,33 @@
     // 搜索回复
     if (msg.type === 'file_search' && msg.ok) {
       handleFileSearchResponse(msg);
+      return;
+    }
+
+    // 剪贴板回复
+    if (msg.type === 'clipboard_set' && msg.ok && msg.id === clipboardSetMsgId) {
+      clipboardSetMsgId = null;
+      showToast('✅ 已复制到工作电脑剪贴板');
+      return;
+    }
+
+    if (msg.type === 'clipboard_get' && msg.ok && msg.id === clipboardGetMsgId) {
+      clipboardGetMsgId = null;
+      const text = msg.payload?.text;
+      if (!text) {
+        showToast('工作电脑剪贴板为空');
+      } else {
+        const tabId = clipboardGetTabId;
+        const editor = state.editors[tabId];
+        if (editor) {
+          editor.executeEdits('clipboard-paste', [{
+            range: editor.getSelection() || editor.getModel().getFullModelRange(),
+            text,
+            forceMoveMarkers: true,
+          }]);
+        }
+        showToast('✅ 已粘贴来自工作电脑的内容');
+      }
       return;
     }
 
@@ -523,6 +555,8 @@
     header.innerHTML = `
       <span class="file-path">${escapeHtml(filePath)}</span>
       <span class="file-info">${content ? formatSize(new Blob([content]).size) : ''}</span>
+      <button class="clip-btn" data-tab="${tabId}" title="复制到工作电脑剪贴板">📋</button>
+      <button class="paste-btn" data-tab="${tabId}" title="从工作电脑剪贴板获取内容">📋↑</button>
       <button class="save-btn ${state.mode === 'edit' ? 'show' : ''}" data-tab="${tabId}">保存</button>
     `;
     container.appendChild(header);
@@ -537,6 +571,30 @@
     // 保存按钮
     header.querySelector('.save-btn').addEventListener('click', () => {
       saveFile(tabId, filePath);
+    });
+
+    // 剪贴板复制按钮
+    header.querySelector('.clip-btn').addEventListener('click', () => {
+      const editor = state.editors[tabId];
+      if (!editor) return;
+      const text = editor.getSelection()
+        ? editor.getModel().getValueInRange(editor.getSelection())
+        : editor.getValue();
+      if (!text) {
+        showToast('没有可复制的内容');
+        return;
+      }
+      clipboardSetMsgId = sendMsg('clipboard_set', { text });
+      if (clipboardSetMsgId) showToast('📋 正在发送到工作电脑...');
+    });
+
+    // 剪贴板粘贴按钮
+    header.querySelector('.paste-btn').addEventListener('click', () => {
+      const editor = state.editors[tabId];
+      if (!editor) return;
+      clipboardGetMsgId = sendMsg('clipboard_get', {});
+      clipboardGetTabId = tabId;
+      if (clipboardGetMsgId) showToast('📋 正在获取工作电脑剪贴板...');
     });
 
     // 创建 Monaco 编辑器

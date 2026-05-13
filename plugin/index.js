@@ -199,13 +199,15 @@ class HanaRemotePlugin {
         try {
           await this._ensureSessionsReady();
           if (!this.activeSessionPath) {
+            console.log('[chat] 没有可用会话');
             this.wsClient.send({ id, ok: false, error: '没有可用会话' });
             break;
           }
-          // 用桌面端的会话路径发消息
+          console.log(`[chat] 发送消息到会话: ${this.activeSessionPath.slice(0, 60)}...`);
           const enhancedPayload = { ...msg.payload, sessionPath: this.activeSessionPath };
           this.chatHandler.handle({ ...msg, payload: enhancedPayload });
         } catch (err) {
+          console.error('[chat] 发送失败:', err.message);
           this.wsClient.send({ id, ok: false, error: err.message });
         }
         break;

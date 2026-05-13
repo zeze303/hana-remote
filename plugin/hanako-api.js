@@ -135,15 +135,26 @@ class HanakoApi {
           switch (msg.type) {
             case 'text_delta':
               // 收到新内容 → 取消延迟关闭，继续接收
+              clearGrace();
               if (onChunk) onChunk(msg.delta || '');
               break;
 
             case 'thinking_delta':
               // 思考过程（内部推理、mood 等）
+              clearGrace();
               if (onThinking) onThinking(msg.delta || '');
               break;
 
+            case 'thinking_start':
+              clearGrace();
+              break;
+
+            case 'thinking_end':
+              clearGrace();
+              break;
+
             case 'tool_start':
+              clearGrace();
               // 工具调用开始
               if (onThinking) {
                 const name = msg.name || '工具';
@@ -153,6 +164,7 @@ class HanakoApi {
               break;
 
             case 'tool_end':
+              clearGrace();
               // 工具调用结束
               if (onThinking) {
                 const status = msg.success ? '✅' : '❌';
@@ -164,7 +176,7 @@ class HanakoApi {
               // 不立即关闭，启动延迟定时器
               // 如果 Hanako 还在用工具，后续会有更多 text_delta
               clearGrace();
-              graceTimer = setTimeout(finalize, 2000);
+              graceTimer = setTimeout(finalize, 10000);
               break;
 
             case 'error':

@@ -214,7 +214,7 @@
 
   function renderTreeChildren(payload) {
     if (!treeMsgCallback) return;
-    const { path } = treeMsgCallback;
+    const { path, level } = treeMsgCallback;
     treeMsgCallback = null;
 
     const containerId = `children_${pathToId(path)}`;
@@ -224,7 +224,7 @@
     container.innerHTML = '';
     container.classList.add('open');
 
-    const parentLevel = treeMsgCallback ? (treeMsgCallback.level || 0) : 0;
+    const parentLevel = level || 0;
     (payload.children || []).forEach(child => {
       const node = createTreeNode(child, payload.path || '', parentLevel + 1);
       container.appendChild(node);

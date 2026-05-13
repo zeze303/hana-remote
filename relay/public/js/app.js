@@ -80,9 +80,15 @@
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       state.connected = false;
       if (state.ws === ws) {
+        // Token 过期（WebSocket close code 4003），跳转回登录页
+        if (e.code === 4003) {
+          localStorage.removeItem('token');
+          location.href = '/login.html';
+          return;
+        }
         setStatus('red', '连接断开');
         disableChat(true);
         setTimeout(connectWS, 3000);

@@ -104,6 +104,22 @@ class HanakoApi {
       const ws = new WebSocket(wsUrl);
       this.ws = ws;
 
+      // 延迟完成定时器：收到 turn_end 后等多一会儿再关闭
+      let graceTimer = null;
+
+      function clearGrace() {
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          graceTimer = null;
+        }
+      }
+
+      function finalize() {
+        clearGrace();
+        if (onDone) onDone();
+        try { ws.close(); } catch {}
+      }
+
       ws.on('open', () => {
         ws.send(JSON.stringify({
           type: 'prompt',
@@ -118,16 +134,23 @@ class HanakoApi {
 
           switch (msg.type) {
             case 'text_delta':
+              // 收到新内容 → 取消延迟关闭，继续接收
               if (onChunk) onChunk(msg.delta || '');
               break;
+
             case 'turn_end':
-              if (onDone) onDone();
-              ws.close();
+              // 不立即关闭，启动延迟定时器
+              // 如果 Hanako 还在用工具，后续会有更多 text_delta
+              clearGrace();
+              graceTimer = setTimeout(finalize, 2000);
               break;
+
             case 'error':
+              clearGrace();
               if (onError) onError(new Error(msg.message || '未知错误'));
               ws.close();
               break;
+
             default:
               break;
           }
@@ -135,20 +158,21 @@ class HanakoApi {
       });
 
       ws.on('error', err => {
+        clearGrace();
         if (onError) onError(err);
       });
 
       ws.on('close', () => {
+        clearGrace();
         this.ws = null;
       });
 
-      // 超时保护
+      // 超时保护（120 秒，给工具执行留足时间）
       setTimeout(() => {
         if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-          ws.close();
-          if (onDone) onDone();
+          finalize();
         }
-      }, 60000);
+      }, 120000);
 
     } catch (e) {
       if (onError) onError(e);

@@ -185,7 +185,7 @@ wss.on('connection', (ws, req) => {
     if (role === 'worker') {
       handleWorkerMessage(msg, connManager);
     } else if (role === 'client') {
-      handleClientMessage(msg, clientId, connManager);
+      handleClientMessage(msg, clientId, connManager, ws);
     }
   });
 

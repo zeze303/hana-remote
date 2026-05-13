@@ -30,7 +30,7 @@ function getLogs(limit = 100) {
  * @param {import('./conn-manager')} connManager
  * @param {import('ws').WebSocket} ws - client 的 WebSocket
  */
-function handleClientMessage(message, clientId, connManager) {
+function handleClientMessage(message, clientId, connManager, ws) {
   const { id, type, payload } = message;
 
   if (!id || !type) {

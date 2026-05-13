@@ -695,6 +695,40 @@
   });
 
   // ========================================
+  //  侧栏拖动
+  // ========================================
+
+  function initSplitter() {
+    const splitter = $('splitter');
+    const sidebar = $('sidebar');
+    let dragging = false;
+
+    splitter.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      dragging = true;
+      splitter.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const width = Math.max(120, Math.min(e.clientX - 2, window.innerWidth * 0.6));
+      sidebar.style.width = width + 'px';
+      sidebar.style.flexShrink = '0';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (dragging) {
+        dragging = false;
+        splitter.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+  }
+
+  // ========================================
   //  工具函数
   // ========================================
 
@@ -717,6 +751,9 @@
 
     // 连接 WebSocket
     connectWS();
+
+    // 初始化侧栏拖动
+    initSplitter();
 
     // 加载文件树
     fileTree.innerHTML = '<div class="loading">加载驱动器列表...</div>';

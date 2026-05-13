@@ -114,11 +114,29 @@ html, body {
 /* ── 左侧栏 ── */
 #sidebar {
   width: var(--sidebar-width);
+  min-width: 120px;
+  max-width: 60vw;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+}
+
+/* ── 拖动条 ── */
+#splitter {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+#splitter:hover,
+#splitter.active {
+  background: var(--accent);
 }
 
 .sidebar-header {

@@ -27,7 +27,7 @@ class HanaRemotePlugin {
 
     // 聊天处理器（历史和会话直接从 Jsonl 读取）
     this.chatHandler = createChatHandler({
-      sendToRelay: (msg) => this.wsClient.send(msg),
+      sendToRelay: (msg) => this._sendToRelayWithRetry(msg),
       hanakoApi: this.hanakoApi,
     });
 
@@ -335,6 +335,16 @@ class HanaRemotePlugin {
       default:
         this.wsClient.send({ id, ok: false, error: `未知消息类型: ${type}` });
     }
+  }
+
+  /**
+   * 发送消息到 Relay，失败时自动重试（最多 20 次，间隔 2 秒）
+   */
+  _sendToRelayWithRetry(msg, retries = 20) {
+    if (this.wsClient.send(msg)) return true;
+    if (retries <= 0) return false;
+    setTimeout(() => this._sendToRelayWithRetry(msg, retries - 1), 2000);
+    return false;
   }
 }
 

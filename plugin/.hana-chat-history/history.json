@@ -63,5 +63,10 @@
     "type": "user",
     "text": "把grace timer拉长到180秒吧",
     "time": 1778687116839
+  },
+  {
+    "type": "hanako",
+    "text": "已改。grace timer 180 秒（`turn_end` 后等这么久才关闭），总体超时 300 秒。`git pull` 重启插件生效。",
+    "time": 1778687141498
   }
 ]

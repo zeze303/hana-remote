@@ -79,4 +79,4 @@ function clearHistory(sessionId) {
   } catch {}
 }
 
-module.exports = { loadHistory, addEntry, clearHistory };
+module.exports = { loadHistory, addEntry, clearHistory, setSession };

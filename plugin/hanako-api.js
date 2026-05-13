@@ -126,12 +126,33 @@ class HanakoApi {
         try { ws.close(); } catch {}
       }
 
+      // 心跳保活：每 15 秒发 ping，防止 Hanako 服务端断开空闲连接
+      let pingTimer = null;
+      function startPing() {
+        stopPing();
+        pingTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.ping();
+          } else {
+            stopPing();
+          }
+        }, 15000);
+      }
+      function stopPing() {
+        if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+      }
+
       ws.on('open', () => {
+        startPing();
         ws.send(JSON.stringify({
           type: 'prompt',
           text,
           sessionPath: this.sessionId,
         }));
+      });
+
+      ws.on('pong', () => {
+        // 收到 pong，连接正常
       });
 
       ws.on('message', raw => {
@@ -204,6 +225,7 @@ class HanakoApi {
 
       ws.on('close', () => {
         clearGrace();
+        stopPing();
         this.ws = null;
       });
 

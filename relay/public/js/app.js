@@ -931,15 +931,8 @@
   }
 
   function handleChatResponse(msg) {
-    if (msg.id !== chatMsgId) {
-      console.log('[chat] 忽略旧消息:', msg.id, '!=', chatMsgId);
-      return;
-    }
+    if (msg.id !== chatMsgId) return;
     const p = msg.payload || {};
-    if (p.text) console.log('[chat] text_delta:', p.text.slice(0, 40));
-    if (p.thinking) console.log('[chat] thinking:', p.thinking.slice(0, 40));
-    if (p.done) console.log('[chat] done');
-    if (p.error) console.log('[chat] error:', p.error);
 
     // 错误处理
     if (!msg.ok || p.error) {

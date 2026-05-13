@@ -7,8 +7,18 @@ const http = require('http');
 
 let hanakoServerInfo = null;
 
+// 会话列表缓存，避免每次请求都读所有 .jsonl 文件
+let sessionsCache = null;
+let sessionsCacheTime = 0;
+const CACHE_TTL = 30000; // 30 秒
+
 function init(serverInfo) {
   hanakoServerInfo = serverInfo;
+  sessionsCache = null;
+}
+
+function invalidateCache() {
+  sessionsCache = null;
 }
 
 function httpRequest(method, apiPath, body) {
@@ -37,11 +47,17 @@ function httpRequest(method, apiPath, body) {
 /**
  * 从 Hanako API 列出所有会话
  * 返回: [{ id, title, path, createdAt, messageCount }]
+ * 结果缓存 30 秒，避免每次请求都重读所有 .jsonl
  */
-async function listSessions() {
+async function listSessions(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && sessionsCache && (now - sessionsCacheTime < CACHE_TTL)) {
+    return sessionsCache;
+  }
+
   const res = await httpRequest('GET', '/api/sessions');
   if (res.status !== 200 || !Array.isArray(res.body)) {
-    return [];
+    return sessionsCache || [];
   }
 
   const sessions = [];
@@ -49,27 +65,27 @@ async function listSessions() {
     const sessionPath = item.path;
     if (!sessionPath) continue;
 
-    // 从文件路径中提取创建时间
     const fileName = path.basename(sessionPath, '.jsonl');
-    // 格式: 2026-05-13T10-14-37-758Z_019e20d4-cdbe-764e-b0ea-95f35c04c168
-    const timeStr = fileName.split('_')[0]?.replace(/T/g, 'T').replace(/-(\d{2})-(\d{2})-/, '-');
     let createdAt = 0;
     try {
-      createdAt = new Date(fileName.split('_')[0].replace(/-/g, '-').replace(/T/, 'T')).getTime();
+      createdAt = new Date(fileName.split('_')[0].replace(/-/g, '-')).getTime();
     } catch {}
 
-    // 读取会话文件获取标题和消息数
+    // 只读前 20KB 获取标题和消息数
     let title = '对话';
     let messageCount = 0;
     try {
-      const content = fs.readFileSync(sessionPath, 'utf-8');
-      const lines = content.trim().split('\n');
+      const fd = fs.openSync(sessionPath, 'r');
+      const buf = Buffer.alloc(20480);
+      const bytesRead = fs.readSync(fd, buf, 0, 20480, 0);
+      fs.closeSync(fd);
+      const partial = buf.toString('utf-8', 0, bytesRead);
+      const lines = partial.split('\n');
       for (const line of lines) {
         try {
           const msg = JSON.parse(line);
           if (msg.type === 'message' && msg.message) {
             messageCount++;
-            // 第一条用户消息作为标题
             if (msg.message.role === 'user' && title === '对话') {
               const text = extractText(msg.message.content);
               if (text) title = text.replace(/\s+/g, ' ').trim().slice(0, 50);
@@ -88,8 +104,9 @@ async function listSessions() {
     });
   }
 
-  // 按创建时间倒序（最新的在前）
   sessions.sort((a, b) => b.createdAt - a.createdAt);
+  sessionsCache = sessions;
+  sessionsCacheTime = now;
   return sessions;
 }
 
@@ -102,7 +119,6 @@ function getHistory(sessionPath) {
     const content = fs.readFileSync(sessionPath, 'utf-8');
     const entries = [];
     const lines = content.trim().split('\n');
-    console.log(`[session] getHistory: ${sessionPath}, ${lines.length} lines`);
 
     for (const line of lines) {
       try {
@@ -110,44 +126,31 @@ function getHistory(sessionPath) {
         if (msg.type !== 'message' || !msg.message) continue;
 
         const role = msg.message.role;
-        console.log(`[session]   line role=${role} id=${msg.id?.slice(0,8)}`);
-
         if (role === 'user') {
           const text = extractText(msg.message.content);
-          console.log(`[session]   user text=${text?.slice(0,40)}`);
           if (text) entries.push({ type: 'user', text });
         } else if (role === 'assistant') {
           const text = extractText(msg.message.content);
-          console.log(`[session]   assistant text=${text?.slice(0,40)}`);
           if (text) entries.push({ type: 'hanako', text });
         }
-      } catch (e) {
-        console.log(`[session]   parse error: ${e.message}`);
-      }
+      } catch {}
     }
 
-    console.log(`[session] getHistory done: ${entries.length} entries`);
     return entries;
-  } catch (e) {
-    console.error(`[session] getHistory error: ${e.message}`);
+  } catch {
     return [];
   }
 }
 
-/**
- * 从 content 数组中提取纯文本
- */
 function extractText(content) {
   if (!content) return '';
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
-    // 先从后往前找 text（最后一个 text 是完整回复）
     let lastText = '';
     for (const c of content) {
       if (c.type === 'text' && c.text) lastText = c.text;
     }
     if (lastText) return lastText;
-    // 没有 text 就找 mood
     for (const c of content) {
       if (c.type === 'mood') return c.mood || '';
     }

@@ -890,7 +890,6 @@
 
   function disableChat(disabled) {
     chatInput.disabled = disabled;
-    chatSendBtn.disabled = disabled;
     if (disabled) {
       chatInput.placeholder = '工作电脑未连接';
     } else {
@@ -922,7 +921,6 @@
       chatMsgTimeout = setTimeout(() => {
         chatMsgId = null;
         chatInput.disabled = false;
-        chatSendBtn.disabled = !state.workerOnline;
       }, 30000);
     }
   }
@@ -941,7 +939,6 @@
       addChatMsg('hanako error', '⚠️ ' + (p.error || '请求失败'));
       clearChatMsgLock();
       chatInput.disabled = false;
-      chatSendBtn.disabled = !state.workerOnline;
       return;
     }
 
@@ -965,7 +962,6 @@
       if (lastMsg) lastMsg.dataset.done = 'true';
       clearChatMsgLock();
       chatInput.disabled = false;
-      chatSendBtn.disabled = !state.workerOnline;
       return;
     }
 
@@ -1100,10 +1096,22 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  chatSendBtn.addEventListener('click', sendChat);
+  // 发送按钮：不用 disabled 属性（用 JS 控制逻辑）
+  chatSendBtn.removeAttribute('disabled');
+  chatSendBtn.addEventListener('click', (e) => {
+    if (!state.workerOnline || !state.connected) {
+      showToast('工作电脑未连接');
+      return;
+    }
+    sendChat();
+  });
   chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (!state.workerOnline || !state.connected) {
+        showToast('工作电脑未连接');
+        return;
+      }
       sendChat();
     }
   });

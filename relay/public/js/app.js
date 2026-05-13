@@ -874,6 +874,7 @@
       const pre = thinkEl.querySelector('pre');
       if (pre) pre.textContent += p.thinking;
       chatMessages.scrollTop = chatMessages.scrollHeight;
+      saveChatHistory();
       return;
     }
 
@@ -898,6 +899,7 @@
 
     lastMsg.textContent += p.text || '';
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    saveChatHistory();
   }
 
   function createThinkingBlock() {
@@ -984,6 +986,53 @@
   }
 
   // ========================================
+  //  聊天历史持久化
+  // ========================================
+
+  /** 保存聊天消息到 localStorage */
+  function saveChatHistory() {
+    const entries = [];
+    chatMessages.childNodes.forEach(node => {
+      if (node.classList?.contains('chat-msg')) {
+        entries.push({ type: node.className.replace('chat-msg ', ''), text: node.textContent });
+      } else if (node.classList?.contains('chat-thinking')) {
+        const pre = node.querySelector('pre');
+        entries.push({ type: 'thinking', text: pre ? pre.textContent : '' });
+      }
+    });
+    try {
+      localStorage.setItem('chatHistory', JSON.stringify(entries));
+    } catch {}
+  }
+
+  /** 从 localStorage 恢复聊天消息 */
+  function loadChatHistory() {
+    try {
+      const raw = localStorage.getItem('chatHistory');
+      if (!raw) return;
+      const entries = JSON.parse(raw);
+      if (!Array.isArray(entries)) return;
+
+      chatMessages.innerHTML = '';
+      for (const entry of entries) {
+        if (entry.type === 'thinking') {
+          const el = createThinkingBlock();
+          const pre = el.querySelector('pre');
+          if (pre) pre.textContent = entry.text || '';
+          chatMessages.appendChild(el);
+        } else {
+          const div = document.createElement('div');
+          div.className = `chat-msg ${entry.type}`;
+          div.textContent = entry.text || '';
+          div.dataset.done = 'true';
+          chatMessages.appendChild(div);
+        }
+      }
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    } catch {}
+  }
+
+  // ========================================
   //  初始化
   // ========================================
 
@@ -998,6 +1047,9 @@
       window.location.href = '/';
       return;
     }
+
+    // 恢复聊天历史
+    loadChatHistory();
 
     // 连接 WebSocket（连接成功后会触发文件树加载）
     connectWS();

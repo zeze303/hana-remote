@@ -14,6 +14,7 @@ class HanaRemotePlugin {
     this.wsClient = null;
     this.chatHandler = null;
     this.activeSessionId = null;
+    this._sessionInitPromise = null;
   }
 
   start(config) {
@@ -21,12 +22,6 @@ class HanaRemotePlugin {
     const workerSecret = config.workerSecret || process.env.WORKER_SECRET || '';
 
     console.log('[hana-remote] 启动插件...');
-
-    // 初始化会话管理器（从本地加载 server-info）
-    this._initSessionManager();
-
-    // 确保有一个默认会话
-    this._ensureDefaultSession();
 
     this.wsClient = new WsClient({ relayUrl, workerSecret });
 
@@ -65,33 +60,33 @@ class HanaRemotePlugin {
   }
 
   _initSessionManager() {
-    try {
-      const infoPath = require('path').join(
-        process.env.USERPROFILE || 'C:/Users/default',
-        '.hanako', 'server-info.json'
-      );
-      const fs = require('fs');
-      const raw = fs.readFileSync(infoPath, 'utf-8');
-      const info = JSON.parse(raw);
-      sessionManager.init(info);
-    } catch (e) {
-      console.error('[session] 初始化会话管理器失败:', e.message);
+    if (this.hanakoApi && this.hanakoApi.serverInfo) {
+      sessionManager.init(this.hanakoApi.serverInfo);
+      console.log('[session] 会话管理器已初始化');
+    } else {
+      console.error('[session] 无法获取 Hanako 服务器信息');
     }
   }
 
-  _ensureDefaultSession() {
+  /** 确保会话已初始化，返回 Promise */
+  _ensureSessionsReady() {
+    if (!this._sessionInitPromise) {
+      this._sessionInitPromise = (async () => {
+        this._initSessionManager();
+        await this._ensureDefaultSession();
+      })();
+    }
+    return this._sessionInitPromise;
+  }
+
+  async _ensureDefaultSession() {
     const sessions = sessionManager.listSessions();
     if (sessions.length === 0) {
-      // 尝试创建一个默认会话
-      sessionManager.createSession().then(session => {
-        this.activeSessionId = session.id;
-        chatHistory.setSession(session.id);
-        console.log(`[session] 默认会话: ${session.id}`);
-      }).catch(err => {
-        console.error('[session] 创建默认会话失败:', err.message);
-      });
+      const session = await sessionManager.createSession();
+      this.activeSessionId = session.id;
+      chatHistory.setSession(session.id);
+      console.log(`[session] 默认会话: ${session.id}`);
     } else {
-      // 使用第一个会话
       this.activeSessionId = sessions[0].id;
       chatHistory.setSession(sessions[0].id);
       console.log(`[session] 使用现有会话: ${this.activeSessionId}`);
@@ -106,7 +101,7 @@ class HanaRemotePlugin {
     console.log('[hana-remote] 插件已停止');
   }
 
-  _handleMessage(msg) {
+  async _handleMessage(msg) {
     const { id, type, payload } = msg;
 
     if (!type) {
@@ -117,7 +112,9 @@ class HanaRemotePlugin {
     switch (type) {
 
       // ── 会话管理 ──
+      // ── 会话管理 ──
       case 'chat_session_list':
+        this._ensureSessionsReady();
         this.wsClient.send({
           id, ok: true, type,
           payload: { sessions: sessionManager.listSessions(), active: this.activeSessionId },
@@ -125,16 +122,20 @@ class HanaRemotePlugin {
         break;
 
       case 'chat_session_create':
-        sessionManager.createSession()
-          .then(session => {
+        (async () => {
+          try {
+            await this._ensureSessionsReady();
+            const session = await sessionManager.createSession();
             this.activeSessionId = session.id;
             chatHistory.setSession(session.id);
             this.wsClient.send({
               id, ok: true, type,
               payload: { session, sessions: sessionManager.listSessions(), active: session.id },
             });
-          })
-          .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
+          } catch (err) {
+            this.wsClient.send({ id, ok: false, error: err.message });
+          }
+        })();
         break;
 
       case 'chat_session_delete':
@@ -176,6 +177,7 @@ class HanaRemotePlugin {
       // ── 聊天 ──
       case 'chat':
         {
+          await this._ensureSessionsReady();
           const sessions = sessionManager.listSessions();
           let session = sessions.find(s => s.id === this.activeSessionId);
           if (!session && sessions.length > 0) {

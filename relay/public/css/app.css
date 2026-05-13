@@ -447,13 +447,14 @@ html, body {
 /* ── 思考过程（可折叠） ── */
 .chat-thinking {
   align-self: flex-start;
+  width: 100%;
   max-width: 100%;
   margin-bottom: 4px;
   font-size: 11px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  overflow: hidden;
+  flex-shrink: 0;
 }
 .chat-thinking summary {
   padding: 4px 10px;
@@ -463,6 +464,12 @@ html, body {
   user-select: none;
   opacity: 0.7;
   transition: opacity 0.15s;
+  display: list-item;
+  list-style: disclosure-closed inside;
+}
+.chat-thinking[open] summary {
+  list-style: disclosure-open inside;
+  border-bottom: 1px solid var(--border);
 }
 .chat-thinking summary:hover { opacity: 1; }
 .chat-thinking pre {
@@ -475,7 +482,6 @@ html, body {
   word-wrap: break-word;
   max-height: 200px;
   overflow-y: auto;
-  border-top: 1px solid var(--border);
 }
 
 .chat-msg {
@@ -486,6 +492,7 @@ html, body {
   line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
+  flex-shrink: 0;
 }
 
 .chat-msg.user {

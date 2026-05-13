@@ -1025,20 +1025,25 @@
   //  聊天历史持久化
   // ========================================
 
-  /** 保存聊天消息到 localStorage */
+  /** 保存聊天消息到 localStorage（带防抖） */
+  let _saveTimer = null;
   function saveChatHistory() {
-    const entries = [];
-    chatMessages.childNodes.forEach(node => {
-      if (node.classList?.contains('chat-msg')) {
-        entries.push({ type: node.className.replace('chat-msg ', ''), text: node.textContent });
-      } else if (node.classList?.contains('chat-thinking')) {
-        const pre = node.querySelector('pre');
-        entries.push({ type: 'thinking', text: pre ? pre.textContent : '' });
-      }
-    });
-    try {
-      localStorage.setItem('chatHistory', JSON.stringify(entries));
-    } catch {}
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+      _saveTimer = null;
+      const entries = [];
+      chatMessages.childNodes.forEach(node => {
+        if (node.classList?.contains('chat-msg')) {
+          entries.push({ type: node.className.replace('chat-msg ', ''), text: node.textContent });
+        } else if (node.classList?.contains('chat-thinking')) {
+          const pre = node.querySelector('pre');
+          entries.push({ type: 'thinking', text: pre ? pre.textContent : '' });
+        }
+      });
+      try {
+        localStorage.setItem('chatHistory', JSON.stringify(entries));
+      } catch {}
+    }, 300);
   }
 
   /** 从 localStorage 恢复聊天消息 */

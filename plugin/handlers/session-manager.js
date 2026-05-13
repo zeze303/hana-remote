@@ -1,42 +1,14 @@
-// plugin/handlers/session-manager.js — 对话会话管理
-// 管理多个 Hanako 会话，每个会话有独立的 Hanako session 和聊天历史
+// plugin/handlers/session-manager.js — 会话管理
+// 直接读取和复用 Hanako 桌面端的会话，实现桌面端 ↔ 网页端互通
 
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
-const SESSIONS_DIR = path.join(__dirname, '..', '.hana-chat-sessions');
-const SESSIONS_FILE = path.join(SESSIONS_DIR, 'sessions.json');
-const MAX_SESSIONS = 20;
-
 let hanakoServerInfo = null;
 
 function init(serverInfo) {
   hanakoServerInfo = serverInfo;
-}
-
-function ensureDir() {
-  if (!fs.existsSync(SESSIONS_DIR)) {
-    fs.mkdirSync(SESSIONS_DIR, { recursive: true });
-  }
-}
-
-function loadSessions() {
-  try {
-    ensureDir();
-    if (!fs.existsSync(SESSIONS_FILE)) return [];
-    const raw = fs.readFileSync(SESSIONS_FILE, 'utf-8');
-    return JSON.parse(raw);
-  } catch { return []; }
-}
-
-function saveSessions(sessions) {
-  try {
-    ensureDir();
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('[session] 保存会话列表失败:', e.message);
-  }
 }
 
 function httpRequest(method, apiPath, body) {
@@ -63,76 +35,106 @@ function httpRequest(method, apiPath, body) {
 }
 
 /**
- * 列出所有会话
+ * 从 Hanako API 列出所有会话
+ * 返回: [{ id, title, path, createdAt, messageCount }]
  */
-function listSessions() {
-  return loadSessions();
-}
-
-/**
- * 创建新会话
- */
-async function createSession() {
-  const sessions = loadSessions();
-  if (sessions.length >= MAX_SESSIONS) {
-    throw new Error(`会话数已达上限 (${MAX_SESSIONS})`);
+async function listSessions() {
+  const res = await httpRequest('GET', '/api/sessions');
+  if (res.status !== 200 || !Array.isArray(res.body)) {
+    return [];
   }
 
-  // 创建 Hanako 会话
-  const res = await httpRequest('POST', '/api/sessions/new');
-  if (res.status !== 200 || !res.body?.path) {
-    throw new Error(`创建 Hanako 会话失败: ${JSON.stringify(res.body).slice(0, 100)}`);
+  const sessions = [];
+  for (const item of res.body) {
+    const sessionPath = item.path;
+    if (!sessionPath) continue;
+
+    // 从文件路径中提取创建时间
+    const fileName = path.basename(sessionPath, '.jsonl');
+    // 格式: 2026-05-13T10-14-37-758Z_019e20d4-cdbe-764e-b0ea-95f35c04c168
+    const timeStr = fileName.split('_')[0]?.replace(/T/g, 'T').replace(/-(\d{2})-(\d{2})-/, '-');
+    let createdAt = 0;
+    try {
+      createdAt = new Date(fileName.split('_')[0].replace(/-/g, '-').replace(/T/, 'T')).getTime();
+    } catch {}
+
+    // 读取会话文件获取标题和消息数
+    let title = '对话';
+    let messageCount = 0;
+    try {
+      const content = fs.readFileSync(sessionPath, 'utf-8');
+      const lines = content.trim().split('\n');
+      for (const line of lines) {
+        try {
+          const msg = JSON.parse(line);
+          if (msg.type === 'message' && msg.message) {
+            messageCount++;
+            // 第一条用户消息作为标题
+            if (msg.message.role === 'user' && title === '对话') {
+              const text = extractText(msg.message.content);
+              if (text) title = text.slice(0, 50);
+            }
+          }
+        } catch {}
+      }
+    } catch {}
+
+    sessions.push({
+      id: fileName,
+      title,
+      hanakoSessionPath: sessionPath,
+      createdAt,
+      messageCount,
+    });
   }
 
-  const hanakoSessionPath = res.body.path;
-  const num = sessions.length + 1;
-  const session = {
-    id: `session_${Date.now()}`,
-    title: `对话 ${num}`,
-    hanakoSessionPath,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-
-  sessions.push(session);
-  saveSessions(sessions);
-
-  console.log(`[session] 创建会话: ${session.id} → ${hanakoSessionPath}`);
-  return session;
-}
-
-/**
- * 删除会话
- */
-async function deleteSession(sessionId) {
-  const sessions = loadSessions();
-  const idx = sessions.findIndex(s => s.id === sessionId);
-  if (idx === -1) throw new Error('会话不存在');
-
-  const session = sessions[idx];
-  sessions.splice(idx, 1);
-  saveSessions(sessions);
-
-  // 尝试删除 Hanako 上的会话（非关键步骤）
-  try {
-    const encodedPath = encodeURIComponent(session.hanakoSessionPath);
-    await httpRequest('DELETE', `/api/sessions/${encodedPath}`);
-  } catch {}
-
-  console.log(`[session] 删除会话: ${session.id}`);
+  // 按创建时间倒序（最新的在前）
+  sessions.sort((a, b) => b.createdAt - a.createdAt);
   return sessions;
 }
 
 /**
- * 重命名会话（基于第一条消息）
+ * 从 .jsonl 文件中提取聊天历史
+ * 返回: [{ type: 'user'|'hanako', text }]
  */
-function renameSession(sessionId, title) {
-  const sessions = loadSessions();
-  const session = sessions.find(s => s.id === sessionId);
-  if (!session) return;
-  session.title = title.slice(0, 50);
-  session.updatedAt = Date.now();
-  saveSessions(sessions);
+function getHistory(sessionPath) {
+  try {
+    const content = fs.readFileSync(sessionPath, 'utf-8');
+    const entries = [];
+    const lines = content.trim().split('\n');
+
+    for (const line of lines) {
+      try {
+        const msg = JSON.parse(line);
+        if (msg.type !== 'message' || !msg.message) continue;
+
+        const role = msg.message.role;
+        if (role === 'user') {
+          const text = extractText(msg.message.content);
+          if (text) entries.push({ type: 'user', text });
+        } else if (role === 'assistant') {
+          const text = extractText(msg.message.content);
+          if (text) entries.push({ type: 'hanako', text });
+        }
+        // 忽略 toolResult
+      } catch {}
+    }
+
+    return entries;
+  } catch {
+    return [];
+  }
 }
 
-module.exports = { init, listSessions, createSession, deleteSession, renameSession };
+/**
+ * 从 content 数组中提取纯文本
+ */
+function extractText(content) {
+  if (!Array.isArray(content)) return '';
+  for (const c of content) {
+    if (c.type === 'text' && c.text) return c.text;
+  }
+  return '';
+}
+
+module.exports = { init, listSessions, getHistory };

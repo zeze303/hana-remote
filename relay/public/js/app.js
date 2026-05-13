@@ -378,8 +378,6 @@
     window.location.href = '/';
   });
 
-  chatBtn.addEventListener('click', openChatTab);
-
   // ========================================
   //  文件编辑
   // ========================================

@@ -38,6 +38,7 @@
   const sessionSelect = $('sessionSelect');
   const sessionNewBtn = $('sessionNewBtn');
   const sessionDelBtn = $('sessionDelBtn');
+  const sessionStats = $('sessionStats');
   const logoutBtn = $('logoutBtn');
 
   // ── 搜索状态 ──
@@ -217,6 +218,10 @@
     }
     if (msg.type === 'chat_session_switch' && msg.ok) {
       handleSessionSwitch(msg);
+      return;
+    }
+    if (msg.type === 'session_stats' && msg.ok) {
+      updateSessionStats(msg.payload);
       return;
     }
 
@@ -929,6 +934,13 @@
 
     chatInput.value = '';
 
+    // 标记 /compact 以便完成后弹提示
+    if (text.trim() === '/compact') {
+      state._lastWasCompact = true;
+    } else {
+      state._lastWasCompact = false;
+    }
+
     // 显示用户消息
     addChatMsg('user', text);
     chatMsgId = sendMsg('chat', { text });
@@ -984,6 +996,16 @@
       clearChatStreamTimeout();
       clearChatMsgLock();
       chatInput.disabled = false;
+      // /compact 完成后弹提示
+      if (state._lastWasCompact) {
+        state._lastWasCompact = false;
+        showToast('✅ 对话已压缩');
+        // 延迟请求统计，等插件写完文件
+        setTimeout(requestSessionStats, 1000);
+      } else {
+        // 普通消息完成后更新上下文统计
+        setTimeout(requestSessionStats, 500);
+      }
       return;
     }
 
@@ -1063,6 +1085,8 @@
       }
     }
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    // 获取上下文统计
+    setTimeout(requestSessionStats, 200);
   }
 
   function handleChatHistoryResponse(msg) {
@@ -1095,6 +1119,24 @@
 
   function switchSession(sessionId) {
     sendMsg('chat_session_switch', { sessionId });
+  }
+
+  function requestSessionStats() {
+    if (!state.activeSessionId) return;
+    sendMsg('session_stats', {});
+  }
+
+  function updateSessionStats(payload) {
+    if (!sessionStats) return;
+    const { tokens, msgs } = payload || {};
+    if (tokens > 0) {
+      const label = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : tokens;
+      const pct = Math.min(100, Math.round(tokens / 32000 * 100));
+      const dotClass = pct > 70 ? 'warn' : 'ok';
+      sessionStats.innerHTML = `<span class="stat-dot ${dotClass}"></span>${label} tokens · ${msgs} 条消息`;
+    } else {
+      sessionStats.innerHTML = '';
+    }
   }
 
   function createThinkingBlock() {

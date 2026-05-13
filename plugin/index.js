@@ -194,6 +194,21 @@ class HanaRemotePlugin {
         }
         break;
 
+      // ── 上下文统计 ──
+      case 'session_stats':
+        try {
+          await this._ensureSessionsReady();
+          if (!this.activeSessionPath) {
+            this.wsClient.send({ id, ok: true, type, payload: { chars: 0, tokens: 0, msgs: 0 } });
+            break;
+          }
+          const stats = getSessionStats(this.activeSessionPath);
+          this.wsClient.send({ id, ok: true, type, payload: stats });
+        } catch (err) {
+          this.wsClient.send({ id, ok: true, type, payload: { chars: 0, tokens: 0, msgs: 0 } });
+        }
+        break;
+
       // ── 聊天 ──
       case 'chat':
         try {
@@ -327,6 +342,49 @@ class HanaRemotePlugin {
 function getSessionId(sessions, sessionPath) {
   const s = sessions.find(s => s.hanakoSessionPath === sessionPath);
   return s ? s.id : null;
+}
+
+/**
+ * 估算会话的 token 用量
+ * 读取 .jsonl 文件，按中英文比例粗略估算
+ */
+function getSessionStats(sessionPath) {
+  try {
+    const fs = require('fs');
+    const content = fs.readFileSync(sessionPath, 'utf-8');
+    const lines = content.trim().split('\n');
+    let chineseChars = 0, asciiChars = 0, msgCount = 0;
+    for (const line of lines) {
+      try {
+        const msg = JSON.parse(line);
+        if (msg.type !== 'message' || !msg.message) continue;
+        if (msg.message.role !== 'user' && msg.message.role !== 'assistant') continue;
+        const text = extractTextFromContent(msg.message.content);
+        if (!text) continue;
+        msgCount++;
+        for (const ch of text) {
+          if (ch > '\x7f') chineseChars++;
+          else asciiChars++;
+        }
+      } catch {}
+    }
+    const totalBytes = Buffer.byteLength(content, 'utf-8');
+    const estimatedTokens = Math.round(chineseChars * 1.5 + asciiChars * 0.25);
+    return { chars: totalBytes, tokens: estimatedTokens, msgs: msgCount };
+  } catch {
+    return { chars: 0, tokens: 0, msgs: 0 };
+  }
+}
+
+function extractTextFromContent(content) {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    for (const c of content) {
+      if (c.type === 'text' && c.text) return c.text;
+    }
+  }
+  return '';
 }
 
 module.exports = HanaRemotePlugin;

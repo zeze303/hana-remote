@@ -51,11 +51,21 @@ class ConnectionManager extends EventEmitter {
     this.msgQueue.set(msgId, { clientId, type, timestamp: Date.now() });
   }
 
-  /** 取回 pending 记录 */
+  /** 取回 pending 记录（取后删除） */
   getPending(msgId) {
     const entry = this.msgQueue.get(msgId);
     if (entry) this.msgQueue.delete(msgId);
     return entry;
+  }
+
+  /** 查看 pending 记录（不删除，用于流式回复） */
+  peekPending(msgId) {
+    return this.msgQueue.get(msgId) || null;
+  }
+
+  /** 手动删除 pending 记录 */
+  removePending(msgId) {
+    this.msgQueue.delete(msgId);
   }
 
   /** 广播给所有 client */

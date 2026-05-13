@@ -72,10 +72,16 @@ function handleWorkerMessage(message, connManager) {
   }
 
   // 查找对应 client
-  const pending = connManager.getPending(id);
+  // 对于流式回复（chat 未完成），不删除 pending 记录
+  const isStreaming = type === 'chat' && payload && !payload.done;
+  const pending = isStreaming ? connManager.peekPending(id) : connManager.getPending(id);
   if (!pending) {
-    // 没有等待这个回复的 client，忽略
-    return;
+    return; // 没有等待这个回复的 client
+  }
+
+  // 流式回复完成时清理 pending
+  if (type === 'chat' && payload && payload.done) {
+    connManager.removePending(id);
   }
 
   // 写操作完成时更新日志

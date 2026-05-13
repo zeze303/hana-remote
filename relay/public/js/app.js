@@ -864,6 +864,19 @@
       return;
     }
 
+    // 思考过程
+    if (p.thinking !== undefined) {
+      let thinkEl = chatMessages.querySelector('.chat-thinking:last-child');
+      if (!thinkEl) {
+        thinkEl = createThinkingBlock();
+        chatMessages.appendChild(thinkEl);
+      }
+      const pre = thinkEl.querySelector('pre');
+      if (pre) pre.textContent += p.thinking;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return;
+    }
+
     if (p.done) {
       // 标记最后一条消息已完成
       const lastMsg = chatMessages.querySelector('.chat-msg.hanako:last-child');
@@ -885,6 +898,18 @@
 
     lastMsg.textContent += p.text || '';
     chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function createThinkingBlock() {
+    const details = document.createElement('details');
+    details.className = 'chat-thinking';
+    details.open = false;
+    const summary = document.createElement('summary');
+    summary.textContent = '思考过程';
+    const pre = document.createElement('pre');
+    details.appendChild(summary);
+    details.appendChild(pre);
+    return details;
   }
 
   function addChatMsg(type, text) {

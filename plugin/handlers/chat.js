@@ -38,6 +38,15 @@ function createChatHandler({ sendToRelay, hanakoApi }) {
             payload: { text: chunk, done: false },
           });
         },
+        onThinking(text) {
+          // 发送思考过程到 Relay → 浏览器
+          sendToRelay({
+            id,
+            ok: true,
+            type: 'chat',
+            payload: { thinking: text },
+          });
+        },
         onDone() {
           // 标记完成
           sendToRelay({

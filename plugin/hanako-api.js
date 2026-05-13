@@ -85,7 +85,7 @@ class HanakoApi {
    * 发送消息到 Hanako，流式接收回复
    */
   async sendMessage(text, callbacks = {}) {
-    const { onChunk, onDone, onError } = callbacks;
+    const { onChunk, onDone, onError, onThinking } = callbacks;
 
     try {
       await this.ensureSession();
@@ -94,10 +94,10 @@ class HanakoApi {
       return;
     }
 
-    this._wsSendMessage(text, onChunk, onDone, onError);
+    this._wsSendMessage(text, onChunk, onDone, onError, onThinking);
   }
 
-  _wsSendMessage(text, onChunk, onDone, onError) {
+  _wsSendMessage(text, onChunk, onDone, onError, onThinking) {
     const wsUrl = `ws://127.0.0.1:${this.serverInfo.port}/ws?token=${this.serverInfo.token}`;
 
     try {
@@ -136,6 +136,11 @@ class HanakoApi {
             case 'text_delta':
               // 收到新内容 → 取消延迟关闭，继续接收
               if (onChunk) onChunk(msg.delta || '');
+              break;
+
+            case 'thinking':
+              // 思考过程（内部推理、mood 等）
+              if (onThinking) onThinking(msg.delta || '');
               break;
 
             case 'turn_end':

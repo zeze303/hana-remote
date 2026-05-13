@@ -243,6 +243,29 @@
       label.className = 'tree-node';
       label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
+      if (level > 0) {
+        label.dataset.level = level;
+        // 引导线
+        const guide = document.createElement('div');
+        guide.className = 'tree-guide';
+        guide.style.width = (level * 18) + 'px';
+        // 每个父层级加一条竖线
+        for (let i = 0; i < level; i++) {
+          const vl = document.createElement('div');
+          vl.className = 'line';
+          vl.style.left = (i * 18 + 9) + 'px';
+          vl.style.top = '0';
+          vl.style.bottom = '0';
+          guide.appendChild(vl);
+        }
+        // 当前层级横线
+        const br = document.createElement('div');
+        br.className = 'branch';
+        br.style.left = (level * 18) + 'px';
+        br.style.width = '9px';
+        guide.appendChild(br);
+        label.appendChild(guide);
+      }
 
       const chevron = document.createElement('span');
       chevron.className = 'chevron empty';
@@ -285,6 +308,26 @@
       label.className = 'tree-node';
       label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
+      if (level > 0) {
+        label.dataset.level = level;
+        const guide = document.createElement('div');
+        guide.className = 'tree-guide';
+        guide.style.width = (level * 18) + 'px';
+        for (let i = 0; i < level; i++) {
+          const vl = document.createElement('div');
+          vl.className = 'line';
+          vl.style.left = (i * 18 + 9) + 'px';
+          vl.style.top = '0';
+          vl.style.bottom = '0';
+          guide.appendChild(vl);
+        }
+        const br = document.createElement('div');
+        br.className = 'branch';
+        br.style.left = (level * 18) + 'px';
+        br.style.width = '9px';
+        guide.appendChild(br);
+        label.appendChild(guide);
+      }
 
       const chevron = document.createElement('span');
       chevron.className = 'chevron empty';

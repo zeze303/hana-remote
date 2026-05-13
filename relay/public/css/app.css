@@ -182,10 +182,45 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   transition: 0.1s;
+  position: relative;
 }
 
 .tree-node:hover { background: var(--surface-alt); color: var(--text); }
 .tree-node.active { background: var(--accent-bg); color: var(--accent); }
+
+/* ── 引导线 ── */
+.tree-node {
+  position: relative;
+}
+
+.tree-guide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.tree-guide .line {
+  position: absolute;
+  width: 1px;
+  background: var(--border-light);
+}
+
+.tree-guide .branch {
+  position: absolute;
+  bottom: 50%;
+  height: 1px;
+  background: var(--border-light);
+}
+
+/* 最后一条的竖线只画上半段 */
+.tree-children > div:last-child .tree-guide .line {
+  height: 50%;
+  bottom: auto;
+}
 
 .tree-node .chevron {
   width: 16px;

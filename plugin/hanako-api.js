@@ -59,14 +59,26 @@ class HanakoApi {
     if (this.sessionId) return this.sessionId;
     if (!this._loadServerInfo()) throw new Error('Hanako 未运行');
 
-    const res = await this._request('POST', '/api/sessions/new');
-    if (res.status === 200 && res.body?.id) {
-      this.sessionId = res.body.id;
-      this.ready = true;
-      console.log(`[hanako-api] 会话: ${this.sessionId}`);
-      return this.sessionId;
+    // 优先使用已有会话
+    try {
+      const listRes = await this._request('GET', '/api/sessions');
+      if (listRes.status === 200 && Array.isArray(listRes.body) && listRes.body.length > 0) {
+        this.sessionId = listRes.body[0].path;
+      }
+    } catch {}
+
+    if (!this.sessionId) {
+      const res = await this._request('POST', '/api/sessions/new');
+      if (res.status === 200 && res.body?.path) {
+        this.sessionId = res.body.path;
+      } else {
+        throw new Error(`创建会话失败 (${JSON.stringify(res.body).slice(0, 100)})`);
+      }
     }
-    throw new Error(`创建会话失败 (${res.status})`);
+
+    this.ready = true;
+    console.log(`[hanako-api] 会话: ${this.sessionId}`);
+    return this.sessionId;
   }
 
   /**
@@ -91,13 +103,14 @@ class HanakoApi {
 
     try {
       const ws = new WebSocket(wsUrl);
+      this.ws = ws;
 
       ws.on('open', () => {
-        // 发送对话消息
+        // 发送对话消息（与 Hanako CLI 协议一致）
         ws.send(JSON.stringify({
-          type: 'session:send',
-          sessionId: this.sessionId,
+          type: 'prompt',
           text,
+          sessionPath: this.sessionId,
         }));
       });
 
@@ -105,18 +118,21 @@ class HanakoApi {
         try {
           const msg = JSON.parse(raw.toString());
 
-          if (msg.type === 'stream' && msg.text) {
-            if (onChunk) onChunk(msg.text);
-          }
-
-          if (msg.type === 'done' || msg.done) {
-            if (onDone) onDone();
-            ws.close();
-          }
-
-          if (msg.error) {
-            if (onError) onError(new Error(msg.error));
-            ws.close();
+          switch (msg.type) {
+            case 'text_delta':
+              if (onChunk) onChunk(msg.delta || '');
+              break;
+            case 'turn_end':
+              if (onDone) onDone();
+              ws.close();
+              break;
+            case 'error':
+              if (onError) onError(new Error(msg.message || '未知错误'));
+              ws.close();
+              break;
+            // mood/thinking/tool 等中间状态，忽略
+            default:
+              break;
           }
         } catch {}
       });
@@ -126,7 +142,7 @@ class HanakoApi {
       });
 
       ws.on('close', () => {
-        if (onDone) onDone();
+        this.ws = null;
       });
 
       // 超时保护
@@ -144,7 +160,7 @@ class HanakoApi {
 
   cancelMessage() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'cancel', sessionId: this.sessionId }));
+      this.ws.send(JSON.stringify({ type: 'abort', sessionPath: this.sessionId }));
     }
   }
 }

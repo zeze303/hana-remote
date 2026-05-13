@@ -27,7 +27,6 @@
         </div>
         <span id="modeLabelEdit">编辑</span>
       </label>
-      <button id="chatBtn" class="topbar-btn" title="聊天">💬</button>
       <span class="topbar-sep"></span>
       <button id="logoutBtn" class="topbar-btn" title="退出登录">退出</button>
     </div>
@@ -43,10 +42,10 @@
       <div id="fileTree" class="file-tree"></div>
     </aside>
 
-    <!-- 拖动条 -->
-    <div id="splitter"></div>
+    <!-- 拖动条1 -->
+    <div id="splitter" class="splitter"></div>
 
-    <!-- 右侧：标签页内容 -->
+    <!-- 中间：标签页内容 -->
     <main id="content">
       <div id="tabBar" class="tab-bar">
         <div class="tabs" id="tabs"></div>
@@ -60,23 +59,28 @@
               <circle cx="18" cy="26" r="3" fill="#6366f1" opacity="0.3"/>
               <circle cx="30" cy="26" r="3" fill="#6366f1" opacity="0.3"/>
             </svg>
-            <p>选择左侧文件开始浏览</p>
-            <p class="hint">或点击右上角聊天按钮对话</p>
+            <p>选择文件开始浏览或编辑</p>
           </div>
         </div>
-
-        <!-- 聊天面板 -->
-        <div id="panel_chat_tab" class="panel">
-          <div id="chatMessages" class="chat-messages"></div>
-          <div class="chat-input-area">
-            <textarea id="chatInput" class="chat-input" rows="2" placeholder="输入消息..." disabled></textarea>
-            <button id="chatSendBtn" class="btn-primary" disabled>发送</button>
-          </div>
-        </div>
-
         <!-- 文件编辑器面板（动态生成） -->
       </div>
     </main>
+
+    <!-- 拖动条2 -->
+    <div id="chatSplitter" class="splitter"></div>
+
+    <!-- 右侧：聊天面板 -->
+    <aside id="chatPanel">
+      <div class="sidebar-header">
+        <span class="sidebar-title">💬 对话</span>
+        <span class="sidebar-badge" id="chatBadge"></span>
+      </div>
+      <div id="chatMessages" class="chat-messages"></div>
+      <div class="chat-input-area">
+        <textarea id="chatInput" class="chat-input" rows="2" placeholder="输入消息..." disabled></textarea>
+        <button id="chatSendBtn" class="btn-primary" disabled>发送</button>
+      </div>
+    </aside>
   </div>
 </div>
 

@@ -127,7 +127,7 @@ html, body {
 }
 
 /* ── 拖动条 ── */
-#splitter {
+.splitter {
   width: 4px;
   cursor: col-resize;
   background: transparent;
@@ -137,8 +137,8 @@ html, body {
   transition: background 0.15s;
 }
 
-#splitter:hover,
-#splitter.active {
+.splitter:hover,
+.splitter.active {
   background: var(--accent);
 }
 
@@ -261,7 +261,24 @@ html, body {
 .tree-children.open { display: block; position: relative; }
 .tree-children > div { position: relative; }
 
-/* ── 右侧 ── */
+/* ── 右侧聊天面板 ── */
+#chatPanel {
+  width: 300px;
+  min-width: 200px;
+  max-width: 50vw;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+#chatPanel .sidebar-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── 中间内容区 ── */
 #content {
   flex: 1;
   display: flex;

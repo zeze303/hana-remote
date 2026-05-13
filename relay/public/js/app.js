@@ -31,7 +31,6 @@
   const chatSendBtn = $('chatSendBtn');
   const refreshTreeBtn = $('refreshTreeBtn');
   const logoutBtn = $('logoutBtn');
-  const chatBtn = $('chatBtn');
 
   // ========================================
   //  WebSocket 连接
@@ -618,8 +617,8 @@
       el.className = `tab ${tab.id === state.activeTab ? 'active' : ''}`;
       el.dataset.tabId = tab.id;
 
-      const icon = tab.type === 'chat' ? '💬' : '📄';
-      const label = tab.type === 'chat' ? '聊天' : (tab.label || '文件');
+      const icon = '📄';
+      const label = tab.label || '文件';
 
       el.innerHTML = `${icon} ${escapeHtml(label)} <span class="tab-close">×</span>`;
 
@@ -639,6 +638,7 @@
       const panel = $(`panel_${id}`);
       if (panel) panel.classList.add('active');
     } else {
+      // 没有标签时显示欢迎
       const welcome = $('welcome');
       if (welcome) welcome.classList.add('active');
     }
@@ -724,27 +724,17 @@
     }
   });
 
-  // 聊天标签
-  function openChatTab() {
-    const tabId = 'chat_tab';
-    if (!state.tabs.find(t => t.id === tabId)) {
-      addTab(tabId, 'chat');
-    }
-    switchTab(tabId);
-  }
-
-  // 点击聊天输入框时自动切到聊天标签
-  chatInput.addEventListener('focus', () => {
-    openChatTab();
-  });
+  // 聊天面板始终可见，不需额外操作
+  chatInput.addEventListener('focus', () => {});
 
   // ========================================
   //  侧栏拖动
   // ========================================
 
-  function initSplitter() {
-    const splitter = $('splitter');
-    const sidebar = $('sidebar');
+  function initSplitter(id, targetId, minW, maxRatio, fromRight) {
+    const splitter = $(id);
+    const target = $(targetId);
+    if (!splitter || !target) return;
     let dragging = false;
 
     splitter.addEventListener('mousedown', (e) => {
@@ -757,9 +747,15 @@
 
     document.addEventListener('mousemove', (e) => {
       if (!dragging) return;
-      const width = Math.max(120, Math.min(e.clientX - 2, window.innerWidth * 0.6));
-      sidebar.style.width = width + 'px';
-      sidebar.style.flexShrink = '0';
+      let width;
+      if (fromRight) {
+        // 从右侧拖入：计算右边缘位置
+        width = Math.max(minW, Math.min(window.innerWidth - e.clientX - 2, window.innerWidth * maxRatio));
+      } else {
+        width = Math.max(minW, Math.min(e.clientX - 2, window.innerWidth * maxRatio));
+      }
+      target.style.width = width + 'px';
+      target.style.flexShrink = '0';
     });
 
     document.addEventListener('mouseup', () => {
@@ -802,7 +798,8 @@
     connectWS();
 
     // 初始化侧栏拖动
-    initSplitter();
+    initSplitter('splitter', 'sidebar', 120, 0.6);
+    initSplitter('chatSplitter', 'chatPanel', 200, 0.5, true);
 
     // 占位提示
     fileTree.innerHTML = '<div class="loading">等待连接...</div>';

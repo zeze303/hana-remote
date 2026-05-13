@@ -223,13 +223,15 @@ class HanakoApi {
 
       ws.on('error', err => {
         clearGrace();
+        console.log('[hanako-api] Hanako WS error:', err.message);
         if (onError) onError(err);
       });
 
-      ws.on('close', () => {
+      ws.on('close', (code, reason) => {
         clearGrace();
         stopPing();
         this.ws = null;
+        console.log(`[hanako-api] Hanako WS closed: code=${code} reason=${reason || ''} finalized=${finalized}`);
         // 如果非正常结束（不是 finalize 触发的），通知前端
         if (!finalized) {
           finalized = true;

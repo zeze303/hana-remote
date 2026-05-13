@@ -65,7 +65,7 @@ class WsClient extends EventEmitter {
 
     this.ws.on('close', (code, reason) => {
       this.connected = false;
-      console.log(`[ws-client] 连接断开 (${code}): ${reason || '无原因'}`);
+      console.log(`[ws-client] 连接断开 (${code}): ${reason || '无原因'} 重连=${this._shouldReconnect}`);
       this.emit('disconnected');
       this._scheduleReconnect();
     });

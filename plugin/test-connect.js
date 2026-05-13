@@ -24,6 +24,14 @@ async function main() {
 
   console.log('[test] 插件已启动，连接中...');
 
+  // 全局错误捕获，防止插件静默崩溃
+  process.on('uncaughtException', err => {
+    console.error('[test] ⚠️ 未捕获的异常:', err.message, err.stack?.slice(0, 300));
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[test] ⚠️ 未捕获的 Promise 拒绝:', reason?.message || reason);
+  });
+
   // 定期输出状态
   setInterval(() => {
     const ws = plugin.wsClient;

@@ -342,7 +342,11 @@ class HanaRemotePlugin {
    */
   _sendToRelayWithRetry(msg, retries = 20) {
     if (this.wsClient.send(msg)) return true;
-    if (retries <= 0) return false;
+    console.log(`[_sendToRelayWithRetry] 发送失败，剩余重试 ${retries} 次，msgType=${msg.type}`);
+    if (retries <= 0) {
+      console.log('[sendToRelayWithRetry] 重试耗尽，放弃发送');
+      return false;
+    }
     setTimeout(() => this._sendToRelayWithRetry(msg, retries - 1), 2000);
     return false;
   }

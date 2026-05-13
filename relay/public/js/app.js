@@ -898,15 +898,38 @@
     }
   }
 
+  let chatMsgTimeout = null;
+
   function sendChat() {
     const text = chatInput.value.trim();
-    if (!text || chatMsgId) return;
+    if (!text) return;
+
+    // 如果上一次消息还没收到回复，先清掉（超时保护）
+    if (chatMsgId) {
+      clearTimeout(chatMsgTimeout);
+      chatMsgId = null;
+    }
 
     chatInput.value = '';
 
     // 显示用户消息
     addChatMsg('user', text);
     chatMsgId = sendMsg('chat', { text });
+
+    // 30 秒超时：没收到回复就清掉，允许重新发送
+    if (chatMsgId) {
+      clearTimeout(chatMsgTimeout);
+      chatMsgTimeout = setTimeout(() => {
+        chatMsgId = null;
+        chatInput.disabled = false;
+        chatSendBtn.disabled = !state.workerOnline;
+      }, 30000);
+    }
+  }
+
+  function clearChatMsgLock() {
+    clearTimeout(chatMsgTimeout);
+    chatMsgId = null;
   }
 
   function handleChatResponse(msg) {
@@ -916,7 +939,7 @@
     // 错误处理
     if (!msg.ok || p.error) {
       addChatMsg('hanako error', '⚠️ ' + (p.error || '请求失败'));
-      chatMsgId = null;
+      clearChatMsgLock();
       chatInput.disabled = false;
       chatSendBtn.disabled = !state.workerOnline;
       return;
@@ -940,7 +963,7 @@
       // 标记最后一条消息已完成
       const lastMsg = chatMessages.querySelector('.chat-msg.hanako:last-child');
       if (lastMsg) lastMsg.dataset.done = 'true';
-      chatMsgId = null;
+      clearChatMsgLock();
       chatInput.disabled = false;
       chatSendBtn.disabled = !state.workerOnline;
       return;

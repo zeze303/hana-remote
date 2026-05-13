@@ -293,10 +293,14 @@
           chevron.classList.remove('expanded');
         } else {
           chevron.classList.add('expanded');
+          childrenDiv.classList.add('open');
           if (childrenDiv.children.length === 0) {
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            loading.textContent = '⏳';
+            childrenDiv.appendChild(loading);
             loadTree(fullPath, level + 1);
           }
-          childrenDiv.classList.add('open');
         }
       });
 

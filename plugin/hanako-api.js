@@ -138,9 +138,26 @@ class HanakoApi {
               if (onChunk) onChunk(msg.delta || '');
               break;
 
-            case 'thinking':
+            case 'thinking_delta':
               // 思考过程（内部推理、mood 等）
               if (onThinking) onThinking(msg.delta || '');
+              break;
+
+            case 'tool_start':
+              // 工具调用开始
+              if (onThinking) {
+                const name = msg.name || '工具';
+                const args = msg.args ? JSON.stringify(msg.args).slice(0, 200) : '';
+                onThinking(`🔧 使用 ${name}${args ? ': ' + args : ''}`);
+              }
+              break;
+
+            case 'tool_end':
+              // 工具调用结束
+              if (onThinking) {
+                const status = msg.success ? '✅' : '❌';
+                onThinking(`${status} ${msg.name || '工具'} 完成`);
+              }
               break;
 
             case 'turn_end':

@@ -31,6 +31,7 @@
   const chatSendBtn = $('chatSendBtn');
   const refreshTreeBtn = $('refreshTreeBtn');
   const logoutBtn = $('logoutBtn');
+  const chatBtn = $('chatBtn');
 
   // ========================================
   //  WebSocket 连接
@@ -377,6 +378,8 @@
     localStorage.removeItem('tokenExpires');
     window.location.href = '/';
   });
+
+  chatBtn.addEventListener('click', openChatTab);
 
   // ========================================
   //  文件编辑

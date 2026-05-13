@@ -84,6 +84,10 @@
       setStatus(msg.payload.workerOnline ? 'green' : 'yellow',
         msg.payload.workerOnline ? '工作电脑在线' : '工作电脑未连接');
       disableChat(!msg.payload.workerOnline);
+      // 连接成功后自动加载文件树（若未加载）
+      if (msg.payload.workerOnline && fileTree.children.length < 2) {
+        reloadTree();
+      }
       return;
     }
 
@@ -91,6 +95,8 @@
       state.workerOnline = true;
       setStatus('green', '工作电脑在线');
       disableChat(false);
+      // 插件重连后自动刷新文件树
+      reloadTree();
       return;
     }
 
@@ -204,6 +210,12 @@
     }
   }
 
+  function reloadTree() {
+    fileTree.innerHTML = '<div class="loading">加载驱动器列表...</div>';
+    state.treeExpanded = {};
+    loadRootTree();
+  }
+
   function renderTree(children) {
     fileTree.innerHTML = '';
     children.forEach(child => {
@@ -243,29 +255,6 @@
       label.className = 'tree-node';
       label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
-      if (level > 0) {
-        label.dataset.level = level;
-        // 引导线
-        const guide = document.createElement('div');
-        guide.className = 'tree-guide';
-        guide.style.width = (level * 18) + 'px';
-        // 每个父层级加一条竖线
-        for (let i = 0; i < level; i++) {
-          const vl = document.createElement('div');
-          vl.className = 'line';
-          vl.style.left = (i * 18 + 9) + 'px';
-          vl.style.top = '0';
-          vl.style.bottom = '0';
-          guide.appendChild(vl);
-        }
-        // 当前层级横线
-        const br = document.createElement('div');
-        br.className = 'branch';
-        br.style.left = (level * 18) + 'px';
-        br.style.width = '9px';
-        guide.appendChild(br);
-        label.appendChild(guide);
-      }
 
       const chevron = document.createElement('span');
       chevron.className = 'chevron empty';
@@ -312,26 +301,6 @@
       label.className = 'tree-node';
       label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
-      if (level > 0) {
-        label.dataset.level = level;
-        const guide = document.createElement('div');
-        guide.className = 'tree-guide';
-        guide.style.width = (level * 18) + 'px';
-        for (let i = 0; i < level; i++) {
-          const vl = document.createElement('div');
-          vl.className = 'line';
-          vl.style.left = (i * 18 + 9) + 'px';
-          vl.style.top = '0';
-          vl.style.bottom = '0';
-          guide.appendChild(vl);
-        }
-        const br = document.createElement('div');
-        br.className = 'branch';
-        br.style.left = (level * 18) + 'px';
-        br.style.width = '9px';
-        guide.appendChild(br);
-        label.appendChild(guide);
-      }
 
       const chevron = document.createElement('span');
       chevron.className = 'chevron empty';
@@ -390,11 +359,7 @@
     return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
   }
 
-  refreshTreeBtn.addEventListener('click', () => {
-    fileTree.innerHTML = '<div class="loading">加载中...</div>';
-    treeMsgCallback = { id: null, path: '' };
-    loadRootTree();
-  });
+  refreshTreeBtn.addEventListener('click', reloadTree);
 
   // ========================================
   //  文件编辑
@@ -796,15 +761,14 @@
       return;
     }
 
-    // 连接 WebSocket
+    // 连接 WebSocket（连接成功后会触发文件树加载）
     connectWS();
 
     // 初始化侧栏拖动
     initSplitter();
 
-    // 加载文件树
-    fileTree.innerHTML = '<div class="loading">加载驱动器列表...</div>';
-    loadRootTree();
+    // 占位提示
+    fileTree.innerHTML = '<div class="loading">等待连接...</div>';
 
     // 展示欢迎面板
     showPanel(null);

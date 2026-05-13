@@ -61,13 +61,23 @@ const server = http.createServer((req, res) => {
   }
 
   // 静态文件
-  let filePath = path.join(__dirname, config.staticDir, pathname === '/' ? 'login.html' : pathname);
+  // 路由到具体页面
+  let serveFile;
+  if (pathname === '/' || pathname === '/login') {
+    serveFile = 'login.html';
+  } else if (pathname === '/app') {
+    serveFile = 'app.html';
+  } else {
+    serveFile = pathname;
+  }
+
+  let filePath = path.join(__dirname, config.staticDir, serveFile);
   const ext = path.extname(filePath);
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      // fallback 到 index.html（SPA 路由用）
-      const fallback = path.join(__dirname, config.staticDir, 'index.html');
+      // fallback 到 app.html（SPA 路由用）
+      const fallback = path.join(__dirname, config.staticDir, 'app.html');
       fs.readFile(fallback, (err2, data2) => {
         if (err2) {
           res.writeHead(404);

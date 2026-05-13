@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>hana-remote</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div id="layout">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-text">hana-remote</span>
+    </div>
+    <div class="sidebar-content" id="fileTree">
+      <p class="placeholder">正在开发中...</p>
+    </div>
+  </aside>
+  <main id="main">
+    <div id="connectionBar">
+      <span id="statusDot" class="dot gray"></span>
+      <span id="statusLabel">连接中...</span>
+      <div class="mode-toggle">
+        <span class="mode-label">浏览</span>
+        <label class="switch">
+          <input type="checkbox" id="modeSwitch">
+          <span class="slider"></span>
+        </label>
+        <span class="mode-label">编辑</span>
+      </div>
+    </div>
+    <div id="content">
+      <div class="welcome">
+        <h2>远程控制面板</h2>
+        <p>选择左侧文件开始浏览，或打开聊天面板与 Hanako 对话</p>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="/js/app.js"></script>
+</body>
+</html>

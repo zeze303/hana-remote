@@ -83,13 +83,15 @@
 
     <!-- 右侧：聊天面板 -->
     <aside id="chatPanel">
-      <div class="sidebar-header">
-        <span class="sidebar-title">💬 对话</span>
-        <div class="session-bar">
-          <select id="sessionSelect" class="session-select" title="切换对话"></select>
-          <button id="sessionNewBtn" class="icon-btn" title="新建对话">+</button>
-          <button id="sessionDelBtn" class="icon-btn" title="删除对话" style="color:#ef4444;">✕</button>
+      <div class="sidebar-header chat-header">
+        <div class="chat-header-top">
+          <span class="sidebar-title">💬 对话</span>
+          <div class="session-actions">
+            <button id="sessionNewBtn" class="icon-btn" title="新建对话">+</button>
+            <button id="sessionDelBtn" class="icon-btn" title="删除对话" style="color:#ef4444;">✕</button>
+          </div>
         </div>
+        <select id="sessionSelect" class="session-select" title="切换对话"></select>
       </div>
       <div id="chatMessages" class="chat-messages"></div>
       <div class="chat-input-area">

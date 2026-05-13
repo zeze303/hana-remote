@@ -60,6 +60,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // GET /api/logs — 写入操作日志（需 JWT 验证）
+  if (req.method === 'GET' && pathname === '/api/logs') {
+    const token = req.headers['authorization']?.replace('Bearer ', '');
+    if (!token || !auth.verifyToken(token)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: '未授权' }));
+      return;
+    }
+    const { getLogs } = require('./router');
+    const limit = parseInt(url.searchParams.get('limit')) || 100;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, logs: getLogs(limit) }));
+    return;
+  }
+
   // 静态文件
   // 路由到具体页面
   let serveFile;

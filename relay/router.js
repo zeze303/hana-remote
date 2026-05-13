@@ -1,6 +1,28 @@
 // relay/router.js — 消息路由
 // 将浏览器的请求转发给 worker（Hanako 插件），并将回复回传给对应浏览器
 
+// 写入操作日志（环形缓冲区）
+const MAX_LOG_ENTRIES = 500;
+const writeLog = [];
+
+function addLogEntry(type, clientId, path, result) {
+  writeLog.unshift({
+    time: new Date().toISOString(),
+    type,
+    clientId,
+    path,
+    result,
+  });
+  if (writeLog.length > MAX_LOG_ENTRIES) writeLog.length = MAX_LOG_ENTRIES;
+}
+
+/**
+ * 获取日志列表
+ */
+function getLogs(limit = 100) {
+  return writeLog.slice(0, limit);
+}
+
 /**
  * 处理 client 发来的消息
  * @param {object} message - 解析后的 JSON 对象 { id, type, payload }
@@ -16,8 +38,14 @@ function handleClientMessage(message, clientId, connManager) {
     return;
   }
 
+  // 记录写操作
+  if (type === 'file_write') {
+    addLogEntry('file_write', clientId, payload?.path || '?', 'pending');
+  }
+
   // 检查 worker 是否在线
   if (!connManager.isOnline) {
+    addLogEntry(type, clientId, payload?.path || '', 'failed: worker offline');
     sendError(ws, id, '工作电脑未连接');
     return;
   }
@@ -46,6 +74,11 @@ function handleWorkerMessage(message, connManager) {
   if (!pending) {
     // 没有等待这个回复的 client，忽略
     return;
+  }
+
+  // 写操作完成时更新日志
+  if (pending.type === 'file_write') {
+    addLogEntry('file_write', pending.clientId, payload?.path || '?', payload?.ok ? 'ok' : 'failed');
   }
 
   const clientWs = connManager.clients.get(pending.clientId);

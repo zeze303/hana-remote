@@ -30,6 +30,7 @@
   const chatInput = $('chatInput');
   const chatSendBtn = $('chatSendBtn');
   const refreshTreeBtn = $('refreshTreeBtn');
+  const logoutBtn = $('logoutBtn');
 
   // ========================================
   //  WebSocket 连接
@@ -370,6 +371,12 @@
   }
 
   refreshTreeBtn.addEventListener('click', reloadTree);
+
+  logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('tokenExpires');
+    window.location.href = '/';
+  });
 
   // ========================================
   //  文件编辑
@@ -764,6 +771,11 @@
   //  初始化
   // ========================================
 
+  let _lastActivity = Date.now();
+  const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 分钟
+
+  function resetActivity() { _lastActivity = Date.now(); }
+
   function init() {
     // 检查登录
     if (!state.token) {
@@ -782,6 +794,19 @@
 
     // 展示欢迎面板
     showPanel(null);
+
+    // ── Session 超时检测 ──
+    ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'].forEach(ev => {
+      document.addEventListener(ev, resetActivity, { passive: true });
+    });
+
+    setInterval(() => {
+      if (Date.now() - _lastActivity > SESSION_TIMEOUT) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('tokenExpires');
+        window.location.href = '/';
+      }
+    }, 60000); // 每分钟检查一次
   }
 
   // 页面加载完成后初始化

@@ -254,7 +254,6 @@ class HanakoApi {
       this.ws.send(JSON.stringify({ type: 'abort', sessionPath: this.sessionId }));
     }
   }
-}
 
   /**
    * 发送压缩会话命令（而不是 prompt 文本）

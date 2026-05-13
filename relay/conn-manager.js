@@ -23,7 +23,20 @@ class ConnectionManager extends EventEmitter {
   /** Worker 断开 */
   removeWorker() {
     this.worker = null;
-    // 清理所有等待 worker 回复的消息
+
+    // 给所有有 pending chat 的 client 发送 done 信号，避免前端卡死
+    for (const [msgId, entry] of this.msgQueue) {
+      if (entry.type === 'chat') {
+        const clientWs = this.clients.get(entry.clientId);
+        if (clientWs && clientWs.readyState === 1) {
+          clientWs.send(JSON.stringify({
+            id: msgId, ok: true, type: 'chat',
+            payload: { text: '', done: true },
+          }));
+        }
+      }
+    }
+
     this.msgQueue.clear();
     this.emit('worker:offline');
   }

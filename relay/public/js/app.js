@@ -898,6 +898,24 @@
   }
 
   let chatMsgTimeout = null;
+  let chatStreamTimeout = null;
+
+  function clearChatStreamTimeout() {
+    if (chatStreamTimeout) { clearTimeout(chatStreamTimeout); chatStreamTimeout = null; }
+  }
+
+  function resetChatStreamTimeout() {
+    clearChatStreamTimeout();
+    // 60 秒没新 chunk 自动结束流
+    chatStreamTimeout = setTimeout(() => {
+      if (chatMsgId) {
+        const lastMsg = chatMessages.querySelector('.chat-msg.hanako:last-child');
+        if (lastMsg) lastMsg.dataset.done = 'true';
+        clearChatMsgLock();
+        chatInput.disabled = false;
+      }
+    }, 60000);
+  }
 
   function sendChat() {
     const text = chatInput.value.trim();
@@ -942,6 +960,9 @@
       return;
     }
 
+    // 收到任何数据都重设流超时
+    resetChatStreamTimeout();
+
     // 思考过程
     if (p.thinking !== undefined) {
       let thinkEl = chatMessages.querySelector('.chat-thinking:last-child');
@@ -960,6 +981,7 @@
       // 标记最后一条消息已完成
       const lastMsg = chatMessages.querySelector('.chat-msg.hanako:last-child');
       if (lastMsg) lastMsg.dataset.done = 'true';
+      clearChatStreamTimeout();
       clearChatMsgLock();
       chatInput.disabled = false;
       return;

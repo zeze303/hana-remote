@@ -1,0 +1,14 @@
+{
+  "name": "hana-remote-relay",
+  "version": "1.0.0",
+  "description": "Render 中继服务 — 转发浏览器与 Hanako 插件之间的消息",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

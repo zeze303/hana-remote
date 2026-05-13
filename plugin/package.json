@@ -1,0 +1,9 @@
+{
+  "name": "hana-remote-plugin",
+  "version": "1.0.0",
+  "description": "Hanako 远程连接插件 — 连接 Render 中继，暴露文件系统和聊天接口",
+  "main": "index.js",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

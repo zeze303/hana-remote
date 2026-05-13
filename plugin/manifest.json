@@ -1,0 +1,24 @@
+{
+  "name": "hana-remote",
+  "version": "1.0.0",
+  "description": "远程连接 Relay 中继，提供远程文件浏览/编辑和聊天能力",
+  "type": "full-access",
+  "entry": "index.js",
+  "config": {
+    "relayUrl": {
+      "label": "中继地址",
+      "type": "string",
+      "default": "ws://localhost:3000"
+    },
+    "workerSecret": {
+      "label": "Worker 密钥",
+      "type": "password",
+      "default": ""
+    }
+  },
+  "permissions": [
+    "filesystem:read",
+    "filesystem:write",
+    "network:connect"
+  ]
+}

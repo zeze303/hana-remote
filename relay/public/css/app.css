@@ -162,6 +162,80 @@ html, body {
 }
 .icon-btn:hover { background: var(--surface-alt); color: var(--text); }
 
+/* ── 搜索栏 ── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.search-icon { flex-shrink: 0; }
+.search-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-dim); opacity: 0.6; }
+.search-clear {
+  background: none; border: none;
+  color: var(--text-dim); cursor: pointer;
+  font-size: 12px; padding: 2px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.search-clear:hover { color: var(--text); background: var(--surface-alt); }
+.search-results {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 0;
+  display: none;
+}
+.search-results:not([hidden]) { display: block; }
+.search-result-item {
+  padding: 6px 12px 6px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  transition: background 0.1s;
+}
+.search-result-item:hover { background: var(--surface-alt); }
+.search-result-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-result-path { color: var(--text-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; max-width: 40%; }
+.search-result-type {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+.search-result-type.dir { background: #6366f122; color: #818cf8; }
+.search-result-type.file { background: #22c55e22; color: #4ade80; }
+.search-empty {
+  padding: 20px 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.search-truncated {
+  padding: 4px 16px 8px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 11px;
+  opacity: 0.7;
+}
+
 /* ── 文件树 ── */
 .file-tree {
   flex: 1;

@@ -306,9 +306,75 @@ function cleanupOldBackups(backupDir, days) {
   }
 }
 
+/**
+ * file_search — 递归搜索文件
+ * 从 rootPath 开始，按文件名模糊匹配 query
+ */
+async function handleFileSearch(payload) {
+  const { query, rootPath, maxResults = 100, maxDepth = 4 } = payload;
+
+  if (!query || !query.trim()) {
+    return { results: [], error: '缺少搜索关键词' };
+  }
+
+  const keyword = query.trim().toLowerCase();
+  const results = [];
+  let stopped = false;
+
+  function walk(dir, depth) {
+    if (stopped || results.length >= maxResults) return;
+    if (depth > maxDepth) return;
+
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (stopped || results.length >= maxResults) return;
+
+      const entryPath = path.join(dir, entry.name);
+      const isDir = entry.isDirectory();
+
+      // 文件名匹配（忽略隐藏文件）
+      if (!entry.name.startsWith('.') && entry.name.toLowerCase().includes(keyword)) {
+        try {
+          const s = fs.statSync(entryPath);
+          results.push({
+            name: entry.name,
+            path: entryPath,
+            type: isDir ? 'dir' : 'file',
+            size: isDir ? 0 : s.size,
+            mtime: s.mtime.toISOString(),
+          });
+        } catch {
+          // 跳过权限不足的条目
+        }
+      }
+
+      // 递归目录
+      if (isDir && !entry.name.startsWith('.')) {
+        walk(entryPath, depth + 1);
+      }
+    }
+  }
+
+  const walkRoot = rootPath || 'C:\\';
+  walk(walkRoot, 0);
+
+  return {
+    query,
+    results: results.slice(0, maxResults),
+    truncated: results.length >= maxResults,
+  };
+}
+
 module.exports = {
   handleFileTree,
   handleFileRead,
   handleFileWrite,
   handleFileStat,
+  handleFileSearch,
 };

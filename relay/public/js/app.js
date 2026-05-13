@@ -30,7 +30,15 @@
   const chatInput = $('chatInput');
   const chatSendBtn = $('chatSendBtn');
   const refreshTreeBtn = $('refreshTreeBtn');
+  const searchInput = $('searchInput');
+  const searchClearBtn = $('searchClearBtn');
+  const searchResults = $('searchResults');
   const logoutBtn = $('logoutBtn');
+
+  // ── 搜索状态 ──
+  let searchTimeout = null;
+  let searchMsgId = null;
+  let searchActive = false;
 
   // ========================================
   //  WebSocket 连接
@@ -142,6 +150,12 @@
     // 文件状态回复
     if (msg.type === 'file_stat' && msg.ok) {
       handleFileStatResponse(msg);
+      return;
+    }
+
+    // 搜索回复
+    if (msg.type === 'file_search' && msg.ok) {
+      handleFileSearchResponse(msg);
       return;
     }
 
@@ -370,12 +384,49 @@
     return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
   }
 
-  refreshTreeBtn.addEventListener('click', reloadTree);
+  refreshTreeBtn.addEventListener('click', () => {
+    hideSearchResults();
+    reloadTree();
+  });
 
   logoutBtn.addEventListener('click', () => {
     localStorage.removeItem('token');
     localStorage.removeItem('tokenExpires');
     window.location.href = '/';
+  });
+
+  // ── 搜索事件 ──
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    const val = searchInput.value.trim();
+    searchClearBtn.hidden = !val;
+    if (val.length < 2) {
+      hideSearchResults();
+      return;
+    }
+    searchTimeout = setTimeout(() => doSearch(val), 300);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchTimeout);
+      const val = searchInput.value.trim();
+      if (val.length >= 2) doSearch(val);
+    }
+    if (e.key === 'Escape') {
+      hideSearchResults();
+      searchInput.value = '';
+      searchClearBtn.hidden = true;
+      searchInput.blur();
+    }
+  });
+
+  searchClearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClearBtn.hidden = true;
+    hideSearchResults();
+    searchInput.focus();
   });
 
   // ========================================
@@ -574,6 +625,79 @@
 
   function handleFileStatResponse(msg) {
     // 简单处理，暂时不做额外操作
+  }
+
+  // ========================================
+  //  搜索
+  // ========================================
+
+  function doSearch(query) {
+    searchActive = true;
+    fileTree.style.display = 'none';
+    searchResults.hidden = false;
+    searchResults.innerHTML = '<div class="loading">搜索中...</div>';
+
+    searchMsgId = sendMsg('file_search', {
+      query,
+      rootPath: '',  // 从盘符开始
+      maxResults: 100,
+      maxDepth: 4,
+    });
+  }
+
+  function handleFileSearchResponse(msg) {
+    if (msg.id !== searchMsgId) return;
+    searchMsgId = null;
+
+    const p = msg.payload;
+    if (!p || !p.results || p.results.length === 0) {
+      searchResults.innerHTML = '<div class="search-empty">未找到匹配的文件</div>';
+      return;
+    }
+
+    let html = '';
+    for (const r of p.results) {
+      const icon = r.type === 'dir' ? '📁' : '📄';
+      const typeLabel = r.type === 'dir' ? '目录' : '文件';
+      html += `<div class="search-result-item" data-path="${escapeAttr(r.path)}" data-type="${r.type}">
+        <div class="search-result-name">${icon} ${escapeHtml(r.name)}</div>
+        <div class="search-result-path">${escapeHtml(r.path)} <span class="search-result-type ${r.type}">${typeLabel}</span></div>
+      </div>`;
+    }
+
+    if (p.truncated) {
+      html += '<div class="search-truncated">结果过多，仅显示前 100 条</div>';
+    }
+
+    searchResults.innerHTML = html;
+
+    // 点击打开文件
+    searchResults.querySelectorAll('.search-result-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const path = el.dataset.path;
+        const type = el.dataset.type;
+        if (type === 'file') {
+          openFile(path);
+        }
+        hideSearchResults();
+      });
+    });
+  }
+
+  function hideSearchResults() {
+    searchActive = false;
+    searchResults.hidden = true;
+    searchInput.value = '';
+    searchClearBtn.hidden = true;
+    fileTree.style.display = '';
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function escapeAttr(str) {
+    return String(str).replace(/"/g, '&quot;').replace(/&/g, '&amp;');
   }
 
   // ========================================

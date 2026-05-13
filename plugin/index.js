@@ -2,7 +2,7 @@
 // 连接 Relay 中继，注册文件操作和聊天消息处理
 
 const WsClient = require('./ws-client');
-const { handleFileTree, handleFileRead, handleFileWrite, handleFileStat } = require('./handlers/files');
+const { handleFileTree, handleFileRead, handleFileWrite, handleFileStat, handleFileSearch } = require('./handlers/files');
 const { createChatHandler } = require('./handlers/chat');
 
 class HanaRemotePlugin {
@@ -107,6 +107,12 @@ class HanaRemotePlugin {
 
       case 'file_stat':
         handleFileStat(payload)
+          .then(result => this.wsClient.send({ id, ok: true, type, payload: result }))
+          .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
+        break;
+
+      case 'file_search':
+        handleFileSearch(payload)
           .then(result => this.wsClient.send({ id, ok: true, type, payload: result }))
           .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
         break;

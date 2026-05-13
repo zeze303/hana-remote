@@ -37,6 +37,10 @@ class HanaRemotePlugin {
 
     this.wsClient.on('connected', () => {
       console.log('[hana-remote] 已连接到 Relay');
+      // 如果 Hanako 还没就绪，启动定时重试
+      if (!this.hanakoApi.ready) {
+        this._startHanakoRetry();
+      }
     });
 
     this.wsClient.on('disconnected', () => {
@@ -70,11 +74,61 @@ class HanaRemotePlugin {
   }
 
   stop() {
+    this._stopHanakoRetry();
     if (this.wsClient) {
       this.wsClient.disconnect();
       this.wsClient = null;
     }
     console.log('[hana-remote] 插件已停止');
+  }
+
+  /** 定期检测 Hanako 是否可用，初始失败后自动重连 */
+  _startHanakoRetry() {
+    if (this._hanakoRetryTimer) return;
+    this._hanakoRetryTimer = setInterval(async () => {
+      if (this.hanakoApi.ready) {
+        this._stopHanakoRetry();
+        return;
+      }
+      try {
+        // 只检测连接性，不创建会话
+        if (!this.hanakoApi.serverInfo && !this.hanakoApi._loadServerInfo()) {
+          return;
+        }
+        // 尝试请求会话列表来检测 Hanako 是否在线
+        const http = require('http');
+        const res = await new Promise((resolve, reject) => {
+          const req = http.request({
+            hostname: '127.0.0.1',
+            port: this.hanakoApi.serverInfo.port,
+            path: '/api/sessions',
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${this.hanakoApi.serverInfo.token}` },
+          }, r => { let d = ''; r.on('data', c => d += c); r.on('end', () => resolve(d)); });
+          req.on('error', reject);
+          req.setTimeout(3000, () => { req.destroy(); reject(new Error('timeout')); });
+          req.end();
+        });
+        if (res) {
+          // Hanako 恢复在线，标记 ready 以便后续 _ensureSessionsReady 创建会话
+          this.hanakoApi.ready = true;
+          console.log('[hana-remote] Hanako 已恢复连接');
+          this._stopHanakoRetry();
+          // 通知前端
+          if (this.wsClient && this.wsClient.connected) {
+            this.wsClient.send({ push: true, type: 'hanako_ready' });
+            // 初始化会话
+            this._ensureSessionsReady().catch(() => {});
+          }
+        }
+      } catch {}
+    }, 15000);
+  }
+  _stopHanakoRetry() {
+    if (this._hanakoRetryTimer) {
+      clearInterval(this._hanakoRetryTimer);
+      this._hanakoRetryTimer = null;
+    }
   }
 
   async _handleMessage(msg) {

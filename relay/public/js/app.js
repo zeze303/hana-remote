@@ -56,17 +56,42 @@
   //  WebSocket 连接
   // ========================================
 
+  // ── 重连参数 ──
+  let _reconnectAttempt = 0;
+  const RECONNECT_MAX = 30000; // 最大 30s
+  const RECONNECT_BASE = 1000; // 初始 1s
+
+  function getReconnectDelay() {
+    const delay = Math.min(RECONNECT_BASE * Math.pow(2, _reconnectAttempt), RECONNECT_MAX);
+    _reconnectAttempt++;
+    return delay;
+  }
+
+  function resetReconnect() {
+    _reconnectAttempt = 0;
+  }
+
+  /** 连接前先唤醒 Render 实例 */
+  function wakeRelay() {
+    return fetch('/status')
+      .then(r => r.json())
+      .catch(() => null);
+  }
+
   function connectWS() {
     if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) return;
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${location.host}`;
-    const ws = new WebSocket(wsUrl);
-    state.ws = ws;
 
     setStatus('yellow', '连接中...');
 
+    const ws = new WebSocket(wsUrl);
+    state.ws = ws;
+
     ws.onopen = () => {
+      resetReconnect();
+      setStatus('yellow', '验证中...');
       ws.send(JSON.stringify({
         type: 'auth', role: 'client', token: state.token,
       }));
@@ -84,15 +109,16 @@
     ws.onclose = (e) => {
       state.connected = false;
       if (state.ws === ws) {
-        // Token 过期（WebSocket close code 4003），跳转回登录页
         if (e.code === 4003) {
           localStorage.removeItem('token');
           location.href = '/login.html';
           return;
         }
-        setStatus('red', '连接断开');
+        const delay = getReconnectDelay();
+        const tag = e.code === 1006 ? '' : ` (${e.code})`;
+        setStatus('red', `连接断开${tag} · ${Math.round(delay/1000)}s 后重试`);
         disableChat(true);
-        setTimeout(connectWS, 3000);
+        setTimeout(connectWS, delay);
       }
     };
 
@@ -102,6 +128,9 @@
   function setStatus(color, label) {
     statusDot.className = `dot ${color}`;
     statusLabel.textContent = label;
+    // 断开时显示重连按钮
+    const btn = document.getElementById('btnReconnect');
+    if (btn) btn.style.display = color === 'red' ? 'inline-flex' : 'none';
   }
 
   function handleMessage(msg) {
@@ -1333,6 +1362,13 @@
 
     // 恢复聊天历史
     loadChatHistory();
+
+    // 手动重连按钮
+    $('btnReconnect').addEventListener('click', () => {
+      resetReconnect();
+      if (state.ws) { state.ws.onclose = null; state.ws.close(); state.ws = null; }
+      connectWS();
+    });
 
     // 连接 WebSocket（连接成功后会触发文件树加载）
     connectWS();

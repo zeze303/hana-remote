@@ -253,13 +253,18 @@ class HanaRemotePlugin {
         try {
           await this._ensureSessionsReady();
           if (!this.activeSessionPath) {
-            this.wsClient.send({ id, ok: true, type, payload: { chars: 0, tokens: 0, msgs: 0 } });
+            this.wsClient.send({ id, ok: true, type, payload: { tokens: 0, msgs: 0 } });
             break;
           }
-          const stats = getSessionStats(this.activeSessionPath);
-          this.wsClient.send({ id, ok: true, type, payload: stats });
+          const ctx = await this._getContextUsage(this.activeSessionPath);
+          // 消息数从文件读取（轻量）
+          const msgCount = countMessages(this.activeSessionPath);
+          this.wsClient.send({
+            id, ok: true, type,
+            payload: { tokens: ctx?.tokens ?? 0, msgs: msgCount },
+          });
         } catch (err) {
-          this.wsClient.send({ id, ok: true, type, payload: { chars: 0, tokens: 0, msgs: 0 } });
+          this.wsClient.send({ id, ok: true, type, payload: { tokens: 0, msgs: 0 } });
         }
         break;
 
@@ -404,6 +409,42 @@ class HanaRemotePlugin {
     setTimeout(() => this._sendToRelayWithRetry(msg, retries - 1), 2000);
     return false;
   }
+
+  /**
+   * 通过 Hanako WS 协议获取真实的上下文使用量
+   * 发送 { type: "context_usage", sessionPath }，返回与应用端一致的结果
+   */
+  _getContextUsage(sessionPath) {
+    return new Promise((resolve) => {
+      try {
+        const WebSocket = require('ws');
+        const wsUrl = `ws://127.0.0.1:${this.hanakoApi.serverInfo.port}/ws?token=${this.hanakoApi.serverInfo.token}`;
+        const ws = new WebSocket(wsUrl);
+        let resolved = false;
+        const timeout = setTimeout(() => {
+          if (!resolved) { resolved = true; resolve(null); ws.close(); }
+        }, 3000);
+        ws.on('open', () => {
+          ws.send(JSON.stringify({ type: 'context_usage', sessionPath }));
+        });
+        ws.on('message', raw => {
+          try {
+            const msg = JSON.parse(raw.toString());
+            if (msg.type === 'context_usage' && msg.sessionPath === sessionPath && !resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              ws.close();
+              resolve(msg);
+            }
+          } catch {}
+        });
+        ws.on('error', () => { if (!resolved) { resolved = true; resolve(null); } });
+        ws.on('close', () => { if (!resolved) { resolved = true; resolve(null); } });
+      } catch {
+        resolve(null);
+      }
+    });
+  }
 }
 
 /** 根据 sessionPath 查找 session ID */
@@ -413,52 +454,27 @@ function getSessionId(sessions, sessionPath) {
 }
 
 /**
- * 估算会话的 token 用量
- * 读取 .jsonl 文件，按中英文比例粗略估算
+ * 简单统计会话中的用户消息数量（轻量，只读 open 行）
  */
-function getSessionStats(sessionPath) {
+function countMessages(sessionPath) {
   try {
     const fs = require('fs');
-    const content = fs.readFileSync(sessionPath, 'utf-8');
-    const lines = content.trim().split('\n');
-    let tokens = 0;
-    let msgCount = 0;
-
-    for (const line of lines) {
+    const fd = fs.openSync(sessionPath, 'r');
+    const buf = Buffer.alloc(65536);
+    const bytesRead = fs.readSync(fd, buf, 0, 65536, 0);
+    fs.closeSync(fd);
+    const partial = buf.toString('utf-8', 0, bytesRead);
+    let count = 0;
+    for (const line of partial.split('\n')) {
       try {
         const msg = JSON.parse(line);
-        if (msg.type !== 'message' || !msg.message) continue;
-
-        // 用户消息计数
-        if (msg.message.role === 'user') msgCount++;
-
-        // 助手消息：从 API usage 读取实际 token 数
-        if (msg.message.role === 'assistant' && msg.message.usage) {
-          const usage = msg.message.usage;
-          // cacheRead 是已缓存的上下文大小（累计），input 是本次新增
-          // 取最后一条 assistant 的 cacheRead 作为当前上下文大小
-          if (usage.cacheRead > tokens) {
-            tokens = usage.cacheRead;
-          }
-        }
+        if (msg.type === 'message' && msg.message?.role === 'user') count++;
       } catch {}
     }
-
-    return { chars: 0, tokens, msgs: msgCount };
+    return count;
   } catch {
-    return { chars: 0, tokens: 0, msgs: 0 };
+    return 0;
   }
-}
-
-function extractTextFromContent(content) {
-  if (!content) return '';
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    for (const c of content) {
-      if (c.type === 'text' && c.text) return c.text;
-    }
-  }
-  return '';
 }
 
 module.exports = HanaRemotePlugin;

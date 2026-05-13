@@ -85,16 +85,20 @@ class HanakoApi {
    * 发送消息到 Hanako，流式接收回复
    */
   async sendMessage(text, callbacks = {}) {
+    console.log('[hanako-api] sendMessage 被调用');
     const { onChunk, onDone, onError } = callbacks;
 
     try {
+      console.log('[hanako-api] 检查会话...');
       await this.ensureSession();
+      console.log('[hanako-api] 会话就绪:', this.sessionId);
     } catch (e) {
+      console.log('[hanako-api] 会话检查失败:', e.message);
       if (onError) onError(e);
       return;
     }
 
-    // 通过 WebSocket 连接进行对话
+    console.log('[hanako-api] 开始 WebSocket 对话');
     this._wsSendMessage(text, onChunk, onDone, onError);
   }
 
@@ -103,10 +107,11 @@ class HanakoApi {
 
     try {
       const ws = new WebSocket(wsUrl);
+      console.log('[hanako-api] 连接本地 WS...');
       this.ws = ws;
 
       ws.on('open', () => {
-        // 发送对话消息（与 Hanako CLI 协议一致）
+        console.log('[hanako-api] WS 已连接，发送 prompt');
         ws.send(JSON.stringify({
           type: 'prompt',
           text,
@@ -117,20 +122,22 @@ class HanakoApi {
       ws.on('message', raw => {
         try {
           const msg = JSON.parse(raw.toString());
+          console.log('[hanako-api] WS 收到:', msg.type);
 
           switch (msg.type) {
             case 'text_delta':
               if (onChunk) onChunk(msg.delta || '');
               break;
             case 'turn_end':
+              console.log('[hanako-api] 回复完成');
               if (onDone) onDone();
               ws.close();
               break;
             case 'error':
+              console.log('[hanako-api] WS 错误回复:', msg.message);
               if (onError) onError(new Error(msg.message || '未知错误'));
               ws.close();
               break;
-            // mood/thinking/tool 等中间状态，忽略
             default:
               break;
           }
@@ -138,10 +145,12 @@ class HanakoApi {
       });
 
       ws.on('error', err => {
+        console.log('[hanako-api] WS 连接错误:', err.message);
         if (onError) onError(err);
       });
 
       ws.on('close', () => {
+        console.log('[hanako-api] WS 关闭');
         this.ws = null;
       });
 

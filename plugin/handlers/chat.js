@@ -22,10 +22,12 @@ function createChatHandler({ sendToRelay, hanakoApi }) {
     }
 
     if (!hanakoApi || typeof hanakoApi.sendMessage !== 'function') {
+      console.log('[chat] hanakoApi 不可用:', !!hanakoApi, typeof hanakoApi?.sendMessage);
       sendToRelay({ id, ok: false, type: 'chat', payload: { error: 'Hanako 对话引擎未连接' } });
       return;
     }
 
+    console.log('[chat] 发送消息到 Hanako...');
     try {
       // 调用 Hanako 对话引擎，传入流式回调
       await hanakoApi.sendMessage(userText, {

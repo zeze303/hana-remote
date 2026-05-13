@@ -1,43 +1,47 @@
 // plugin/index.js — Hanako 远程插件入口
-// 连接 Relay 中继，注册文件操作和聊天消息处理
+// 连接 Relay 中继，注册文件操作、聊天、会话管理
 
 const WsClient = require('./ws-client');
 const { handleFileTree, handleFileRead, handleFileWrite, handleFileStat, handleFileSearch } = require('./handlers/files');
 const { handleClipboardSet, handleClipboardGet } = require('./handlers/clipboard');
 const { createChatHandler } = require('./handlers/chat');
 const chatHistory = require('./handlers/chat-history');
+const sessionManager = require('./handlers/session-manager');
 
 class HanaRemotePlugin {
   constructor(hanakoApi) {
-    this.hanakoApi = hanakoApi;     // Hanako 对话引擎接口
+    this.hanakoApi = hanakoApi;
     this.wsClient = null;
     this.chatHandler = null;
+    this.activeSessionId = null;
   }
 
-  // 启动
   start(config) {
     const relayUrl = config.relayUrl || process.env.RELAY_URL || 'ws://localhost:3000';
     const workerSecret = config.workerSecret || process.env.WORKER_SECRET || '';
 
     console.log('[hana-remote] 启动插件...');
 
-    // 创建 WebSocket 客户端
+    // 初始化会话管理器（从本地加载 server-info）
+    this._initSessionManager();
+
+    // 确保有一个默认会话
+    this._ensureDefaultSession();
+
     this.wsClient = new WsClient({ relayUrl, workerSecret });
 
-    // 聊天历史缓冲
     let chatResponseBuffer = [];
 
-    // 创建聊天处理器（包装 sendToRelay 以记录历史）
     this.chatHandler = createChatHandler({
       sendToRelay: (msg) => {
-        // 缓冲 Hanako 回复文本
         if (msg.type === 'chat' && msg.ok && msg.payload?.text && !msg.payload?.done) {
           chatResponseBuffer.push(msg.payload.text);
         }
-        // 回复完成时保存到历史
         if (msg.type === 'chat' && msg.ok && msg.payload?.done) {
           const fullText = chatResponseBuffer.join('');
-          if (fullText) chatHistory.addEntry('hanako', fullText);
+          if (fullText && this.activeSessionId) {
+            chatHistory.addEntry('hanako', fullText, this.activeSessionId);
+          }
           chatResponseBuffer = [];
         }
         this.wsClient.send(msg);
@@ -45,7 +49,6 @@ class HanaRemotePlugin {
       hanakoApi: this.hanakoApi,
     });
 
-    // 监听消息
     this.wsClient.on('message', (msg) => {
       this._handleMessage(msg);
     });
@@ -58,11 +61,43 @@ class HanaRemotePlugin {
       console.log('[hana-remote] 与 Relay 断开');
     });
 
-    // 连接
     this.wsClient.connect();
   }
 
-  // 停止
+  _initSessionManager() {
+    try {
+      const infoPath = require('path').join(
+        process.env.USERPROFILE || 'C:/Users/default',
+        '.hanako', 'server-info.json'
+      );
+      const fs = require('fs');
+      const raw = fs.readFileSync(infoPath, 'utf-8');
+      const info = JSON.parse(raw);
+      sessionManager.init(info);
+    } catch (e) {
+      console.error('[session] 初始化会话管理器失败:', e.message);
+    }
+  }
+
+  _ensureDefaultSession() {
+    const sessions = sessionManager.listSessions();
+    if (sessions.length === 0) {
+      // 尝试创建一个默认会话
+      sessionManager.createSession().then(session => {
+        this.activeSessionId = session.id;
+        chatHistory.setSession(session.id);
+        console.log(`[session] 默认会话: ${session.id}`);
+      }).catch(err => {
+        console.error('[session] 创建默认会话失败:', err.message);
+      });
+    } else {
+      // 使用第一个会话
+      this.activeSessionId = sessions[0].id;
+      chatHistory.setSession(sessions[0].id);
+      console.log(`[session] 使用现有会话: ${this.activeSessionId}`);
+    }
+  }
+
   stop() {
     if (this.wsClient) {
       this.wsClient.disconnect();
@@ -71,7 +106,6 @@ class HanaRemotePlugin {
     console.log('[hana-remote] 插件已停止');
   }
 
-  // 消息分发
   _handleMessage(msg) {
     const { id, type, payload } = msg;
 
@@ -81,32 +115,114 @@ class HanaRemotePlugin {
     }
 
     switch (type) {
-      // 聊天
-      case 'chat':
-        // 保存用户消息到历史
-        if (msg.payload?.text) {
-          chatHistory.addEntry('user', msg.payload.text);
-        }
-        this.chatHandler.handle(msg);
+
+      // ── 会话管理 ──
+      case 'chat_session_list':
+        this.wsClient.send({
+          id, ok: true, type,
+          payload: { sessions: sessionManager.listSessions(), active: this.activeSessionId },
+        });
         break;
 
-      // 取消聊天
+      case 'chat_session_create':
+        sessionManager.createSession()
+          .then(session => {
+            this.activeSessionId = session.id;
+            chatHistory.setSession(session.id);
+            this.wsClient.send({
+              id, ok: true, type,
+              payload: { session, sessions: sessionManager.listSessions(), active: session.id },
+            });
+          })
+          .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
+        break;
+
+      case 'chat_session_delete':
+        sessionManager.deleteSession(payload.sessionId)
+          .then(sessions => {
+            // 如果删除了当前会话，切换到第一个
+            if (this.activeSessionId === payload.sessionId) {
+              this.activeSessionId = sessions.length > 0 ? sessions[0].id : null;
+              if (this.activeSessionId) chatHistory.setSession(this.activeSessionId);
+            }
+            this.wsClient.send({
+              id, ok: true, type,
+              payload: { sessions, active: this.activeSessionId },
+            });
+          })
+          .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
+        break;
+
+      case 'chat_session_switch':
+        {
+          const sessions = sessionManager.listSessions();
+          const session = sessions.find(s => s.id === payload.sessionId);
+          if (!session) {
+            this.wsClient.send({ id, ok: false, error: '会话不存在' });
+            break;
+          }
+          this.activeSessionId = session.id;
+          chatHistory.setSession(session.id);
+
+          // 返回会话信息和对应的聊天历史
+          const history = chatHistory.loadHistory(session.id);
+          this.wsClient.send({
+            id, ok: true, type,
+            payload: { session, sessions, active: session.id, entries: history },
+          });
+        }
+        break;
+
+      // ── 聊天 ──
+      case 'chat':
+        {
+          const sessions = sessionManager.listSessions();
+          let session = sessions.find(s => s.id === this.activeSessionId);
+          if (!session && sessions.length > 0) {
+            session = sessions[0];
+            this.activeSessionId = session.id;
+            chatHistory.setSession(session.id);
+          }
+          if (!session) {
+            this.wsClient.send({ id, ok: false, error: '没有可用会话' });
+            break;
+          }
+
+          // 保存用户消息到当前会话的历史
+          if (msg.payload?.text) {
+            chatHistory.addEntry('user', msg.payload.text, this.activeSessionId);
+          }
+
+          // 更新会话标题（基于首条消息）
+          const msgs = chatHistory.loadHistory(this.activeSessionId);
+          const userMsgCount = msgs.filter(e => e.type === 'user').length;
+          if (userMsgCount === 1 && msg.payload?.text) {
+            sessionManager.renameSession(this.activeSessionId, msg.payload.text.slice(0, 50));
+          }
+
+          // 用指定会话路径发消息
+          const enhancedPayload = { ...msg.payload, sessionPath: session.hanakoSessionPath };
+          this.chatHandler.handle({ ...msg, payload: enhancedPayload });
+        }
+        break;
+
       case 'chat_cancel':
         this.chatHandler.cancel();
         break;
 
-      // 获取聊天历史
       case 'chat_history':
-        this.wsClient.send({ id, ok: true, type, payload: { entries: chatHistory.loadHistory() } });
+        this.wsClient.send({
+          id, ok: true, type,
+          payload: { entries: chatHistory.loadHistory(this.activeSessionId) },
+        });
         break;
 
-      // 清空聊天历史
       case 'chat_history_clear':
-        chatHistory.clearHistory();
+        chatHistory.clearHistory(this.activeSessionId);
         this.wsClient.send({ id, ok: true, type, payload: { ok: true } });
         break;
 
-      // 文件操作
+      // ── 文件操作 ──
       case 'file_tree':
         handleFileTree(payload)
           .then(result => this.wsClient.send({ id, ok: true, type, payload: result }))
@@ -149,7 +265,7 @@ class HanaRemotePlugin {
           .catch(err => this.wsClient.send({ id, ok: false, error: err.message }));
         break;
 
-      // 剪贴板
+      // ── 剪贴板 ──
       case 'clipboard_set':
         handleClipboardSet(payload)
           .then(result => {
@@ -174,5 +290,4 @@ class HanaRemotePlugin {
   }
 }
 
-// 导出（供 Hanako 插件系统加载）
 module.exports = HanaRemotePlugin;

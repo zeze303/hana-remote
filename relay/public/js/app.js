@@ -17,6 +17,8 @@
     activeTab: null,
     editors: {},          // tabId → monaco editor instance
     treeExpanded: {},     // path → true/false
+    sessions: [],         // { id, title, hanakoSessionPath, ... }
+    activeSessionId: null,
   };
 
   // ── DOM 引用 ──
@@ -33,6 +35,9 @@
   const searchInput = $('searchInput');
   const searchClearBtn = $('searchClearBtn');
   const searchResults = $('searchResults');
+  const sessionSelect = $('sessionSelect');
+  const sessionNewBtn = $('sessionNewBtn');
+  const sessionDelBtn = $('sessionDelBtn');
   const logoutBtn = $('logoutBtn');
 
   // ── 搜索状态 ──
@@ -102,9 +107,9 @@
       if (msg.payload.workerOnline && fileTree.children.length < 2) {
         reloadTree();
       }
-      // 拉取聊天历史
+      // 拉取会话列表和聊天历史
       if (msg.payload.workerOnline) {
-        setTimeout(requestChatHistory, 500);
+        setTimeout(requestSessionList, 300);
       }
       return;
     }
@@ -115,8 +120,8 @@
       disableChat(false);
       // 插件重连后自动刷新文件树
       reloadTree();
-      // 插件可能有新聊天记录
-      setTimeout(requestChatHistory, 500);
+      // 拉取会话列表
+      setTimeout(requestSessionList, 300);
       return;
     }
 
@@ -194,6 +199,24 @@
         }
         showToast('✅ 已粘贴来自工作电脑的内容');
       }
+      return;
+    }
+
+    // 会话管理回复
+    if (msg.type === 'chat_session_list' && msg.ok) {
+      handleSessionList(msg);
+      return;
+    }
+    if (msg.type === 'chat_session_create' && msg.ok) {
+      handleSessionCreate(msg);
+      return;
+    }
+    if (msg.type === 'chat_session_delete' && msg.ok) {
+      handleSessionDelete(msg);
+      return;
+    }
+    if (msg.type === 'chat_session_switch' && msg.ok) {
+      handleSessionSwitch(msg);
       return;
     }
 
@@ -471,6 +494,29 @@
     searchClearBtn.hidden = true;
     hideSearchResults();
     searchInput.focus();
+  });
+
+  // ── 会话事件 ──
+  sessionSelect.addEventListener('change', () => {
+    const sessionId = sessionSelect.value;
+    if (sessionId && sessionId !== state.activeSessionId) {
+      switchSession(sessionId);
+    }
+  });
+
+  sessionNewBtn.addEventListener('click', () => {
+    sendMsg('chat_session_create', {});
+    showToast('正在创建新对话...');
+  });
+
+  sessionDelBtn.addEventListener('click', () => {
+    if (!state.activeSessionId || state.sessions.length <= 1) {
+      showToast('至少保留一个对话');
+      return;
+    }
+    if (confirm('删除这个对话？聊天记录也会清除。')) {
+      sendMsg('chat_session_delete', { sessionId: state.activeSessionId });
+    }
   });
 
   // ========================================
@@ -914,6 +960,70 @@
     saveChatHistory();
   }
 
+  function renderSessionSelect(sessions, activeId) {
+    sessionSelect.innerHTML = '';
+    for (const s of sessions) {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.title || s.id;
+      if (s.id === activeId) opt.selected = true;
+      sessionSelect.appendChild(opt);
+    }
+  }
+
+  function handleSessionList(msg) {
+    const p = msg.payload;
+    state.sessions = p.sessions || [];
+    state.activeSessionId = p.active;
+    renderSessionSelect(state.sessions, state.activeSessionId);
+  }
+
+  function handleSessionCreate(msg) {
+    const p = msg.payload;
+    state.sessions = p.sessions || [];
+    state.activeSessionId = p.active;
+    renderSessionSelect(state.sessions, state.activeSessionId);
+    // 清空聊天面板
+    chatMessages.innerHTML = '';
+    saveChatHistory();
+    showToast('✅ 新对话已创建');
+  }
+
+  function handleSessionDelete(msg) {
+    const p = msg.payload;
+    state.sessions = p.sessions || [];
+    state.activeSessionId = p.active;
+    renderSessionSelect(state.sessions, state.activeSessionId);
+    // 清空并重新加载历史
+    chatMessages.innerHTML = '';
+    saveChatHistory();
+    if (state.activeSessionId) {
+      setTimeout(() => sendMsg('chat_history', { sessionId: state.activeSessionId }), 200);
+    }
+    showToast('对话已删除');
+  }
+
+  function handleSessionSwitch(msg) {
+    const p = msg.payload;
+    state.sessions = p.sessions || [];
+    state.activeSessionId = p.active;
+    renderSessionSelect(state.sessions, state.activeSessionId);
+    // 替换聊天面板内容
+    chatMessages.innerHTML = '';
+    const entries = p.entries || [];
+    for (const entry of entries) {
+      if (entry.type === 'thinking') {
+        const el = createThinkingBlock();
+        const pre = el.querySelector('pre');
+        if (pre) pre.textContent = entry.text || '';
+        chatMessages.appendChild(el);
+      } else {
+        addChatMsg(entry.type, entry.text || '');
+      }
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
   function handleChatHistoryResponse(msg) {
     const entries = msg.payload?.entries;
     if (!entries || !Array.isArray(entries) || entries.length === 0) return;
@@ -935,7 +1045,15 @@
   }
 
   function requestChatHistory() {
-    sendMsg('chat_history', {});
+    sendMsg('chat_history', { sessionId: state.activeSessionId });
+  }
+
+  function requestSessionList() {
+    sendMsg('chat_session_list', {});
+  }
+
+  function switchSession(sessionId) {
+    sendMsg('chat_session_switch', { sessionId });
   }
 
   function createThinkingBlock() {

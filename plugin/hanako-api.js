@@ -85,13 +85,19 @@ class HanakoApi {
    * 发送消息到 Hanako，流式接收回复
    */
   async sendMessage(text, callbacks = {}) {
-    const { onChunk, onDone, onError, onThinking } = callbacks;
+    const { onChunk, onDone, onError, onThinking, sessionPath } = callbacks;
 
-    try {
-      await this.ensureSession();
-    } catch (e) {
-      if (onError) onError(e);
-      return;
+    if (sessionPath) {
+      // 使用指定的会话路径
+      this.sessionId = sessionPath;
+      this.ready = true;
+    } else {
+      try {
+        await this.ensureSession();
+      } catch (e) {
+        if (onError) onError(e);
+        return;
+      }
     }
 
     this._wsSendMessage(text, onChunk, onDone, onError, onThinking);

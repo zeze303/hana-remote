@@ -85,7 +85,11 @@
     <aside id="chatPanel">
       <div class="sidebar-header">
         <span class="sidebar-title">💬 对话</span>
-        <span class="sidebar-badge" id="chatBadge"></span>
+        <div class="session-bar">
+          <select id="sessionSelect" class="session-select" title="切换对话"></select>
+          <button id="sessionNewBtn" class="icon-btn" title="新建对话">+</button>
+          <button id="sessionDelBtn" class="icon-btn" title="删除对话" style="color:#ef4444;">✕</button>
+        </div>
       </div>
       <div id="chatMessages" class="chat-messages"></div>
       <div class="chat-input-area">

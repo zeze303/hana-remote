@@ -5,10 +5,16 @@ const fs = require('fs');
 const path = require('path');
 
 const HISTORY_DIR = path.join(__dirname, '..', '.hana-chat-history');
-const HISTORY_FILE = path.join(HISTORY_DIR, 'history.json');
 
+// 每个会话独立的历史文件：history_{sessionId}.json
 // 最多保留 500 条消息，防止文件过大
 const MAX_ENTRIES = 500;
+
+let currentSessionId = null;
+
+function getHistoryFile(sessionId) {
+  return path.join(HISTORY_DIR, `history_${sessionId || 'default'}.json`);
+}
 
 function ensureDir() {
   if (!fs.existsSync(HISTORY_DIR)) {
@@ -17,13 +23,21 @@ function ensureDir() {
 }
 
 /**
- * 读取完整历史
+ * 设置当前会话 ID
  */
-function loadHistory() {
+function setSession(sessionId) {
+  currentSessionId = sessionId;
+}
+
+/**
+ * 读取指定会话的历史
+ */
+function loadHistory(sessionId) {
   try {
     ensureDir();
-    if (!fs.existsSync(HISTORY_FILE)) return [];
-    const raw = fs.readFileSync(HISTORY_FILE, 'utf-8');
+    const file = getHistoryFile(sessionId || currentSessionId || 'default');
+    if (!fs.existsSync(file)) return [];
+    const raw = fs.readFileSync(file, 'utf-8');
     return JSON.parse(raw);
   } catch {
     return [];
@@ -31,33 +45,37 @@ function loadHistory() {
 }
 
 /**
- * 追加一条消息
+ * 追加一条消息到当前会话
  * @param {'user'|'hanako'|'error'} type
  * @param {string} text
+ * @param {string} [sessionId]
  */
-function addEntry(type, text) {
+function addEntry(type, text, sessionId) {
   try {
-    const entries = loadHistory();
+    const sid = sessionId || currentSessionId || 'default';
+    const file = getHistoryFile(sid);
+    let entries = [];
+    if (fs.existsSync(file)) {
+      try { entries = JSON.parse(fs.readFileSync(file, 'utf-8')); } catch {}
+    }
     entries.push({ type, text, time: Date.now() });
-
-    // 截断
     if (entries.length > MAX_ENTRIES) {
       entries.splice(0, entries.length - MAX_ENTRIES);
     }
-
     ensureDir();
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify(entries, null, 2), 'utf-8');
+    fs.writeFileSync(file, JSON.stringify(entries, null, 2), 'utf-8');
   } catch (e) {
     console.error('[chat-history] 保存失败:', e.message);
   }
 }
 
 /**
- * 清空历史
+ * 清空指定会话的历史
  */
-function clearHistory() {
+function clearHistory(sessionId) {
   try {
-    if (fs.existsSync(HISTORY_FILE)) fs.unlinkSync(HISTORY_FILE);
+    const file = getHistoryFile(sessionId || currentSessionId || 'default');
+    if (fs.existsSync(file)) fs.unlinkSync(file);
   } catch {}
 }
 

@@ -28,7 +28,12 @@ function createChatHandler({ sendToRelay, hanakoApi }) {
 
     try {
       // 调用 Hanako 对话引擎，传入流式回调
+      const extraOpts = {};
+      if (msg.payload?.sessionPath) {
+        extraOpts.sessionPath = msg.payload.sessionPath;
+      }
       await hanakoApi.sendMessage(userText, {
+        ...extraOpts,
         onChunk(chunk) {
           // 逐块发送回复给 Relay → 浏览器
           sendToRelay({

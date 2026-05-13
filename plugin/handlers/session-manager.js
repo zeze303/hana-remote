@@ -72,7 +72,7 @@ async function listSessions() {
             // 第一条用户消息作为标题
             if (msg.message.role === 'user' && title === '对话') {
               const text = extractText(msg.message.content);
-              if (text) title = text.slice(0, 50);
+              if (text) title = text.replace(/\s+/g, ' ').trim().slice(0, 50);
             }
           }
         } catch {}
@@ -102,6 +102,7 @@ function getHistory(sessionPath) {
     const content = fs.readFileSync(sessionPath, 'utf-8');
     const entries = [];
     const lines = content.trim().split('\n');
+    console.log(`[session] getHistory: ${sessionPath}, ${lines.length} lines`);
 
     for (const line of lines) {
       try {
@@ -109,19 +110,26 @@ function getHistory(sessionPath) {
         if (msg.type !== 'message' || !msg.message) continue;
 
         const role = msg.message.role;
+        console.log(`[session]   line role=${role} id=${msg.id?.slice(0,8)}`);
+
         if (role === 'user') {
           const text = extractText(msg.message.content);
+          console.log(`[session]   user text=${text?.slice(0,40)}`);
           if (text) entries.push({ type: 'user', text });
         } else if (role === 'assistant') {
           const text = extractText(msg.message.content);
+          console.log(`[session]   assistant text=${text?.slice(0,40)}`);
           if (text) entries.push({ type: 'hanako', text });
         }
-        // 忽略 toolResult
-      } catch {}
+      } catch (e) {
+        console.log(`[session]   parse error: ${e.message}`);
+      }
     }
 
+    console.log(`[session] getHistory done: ${entries.length} entries`);
     return entries;
-  } catch {
+  } catch (e) {
+    console.error(`[session] getHistory error: ${e.message}`);
     return [];
   }
 }
@@ -130,9 +138,19 @@ function getHistory(sessionPath) {
  * 从 content 数组中提取纯文本
  */
 function extractText(content) {
-  if (!Array.isArray(content)) return '';
-  for (const c of content) {
-    if (c.type === 'text' && c.text) return c.text;
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    // 先从后往前找 text（最后一个 text 是完整回复）
+    let lastText = '';
+    for (const c of content) {
+      if (c.type === 'text' && c.text) lastText = c.text;
+    }
+    if (lastText) return lastText;
+    // 没有 text 就找 mood
+    for (const c of content) {
+      if (c.type === 'mood') return c.mood || '';
+    }
   }
   return '';
 }

@@ -421,24 +421,30 @@ function getSessionStats(sessionPath) {
     const fs = require('fs');
     const content = fs.readFileSync(sessionPath, 'utf-8');
     const lines = content.trim().split('\n');
-    let chineseChars = 0, asciiChars = 0, msgCount = 0;
+    let tokens = 0;
+    let msgCount = 0;
+
     for (const line of lines) {
       try {
         const msg = JSON.parse(line);
         if (msg.type !== 'message' || !msg.message) continue;
-        if (msg.message.role !== 'user' && msg.message.role !== 'assistant') continue;
-        const text = extractTextFromContent(msg.message.content);
-        if (!text) continue;
-        msgCount++;
-        for (const ch of text) {
-          if (ch > '\x7f') chineseChars++;
-          else asciiChars++;
+
+        // 用户消息计数
+        if (msg.message.role === 'user') msgCount++;
+
+        // 助手消息：从 API usage 读取实际 token 数
+        if (msg.message.role === 'assistant' && msg.message.usage) {
+          const usage = msg.message.usage;
+          // cacheRead 是已缓存的上下文大小（累计），input 是本次新增
+          // 取最后一条 assistant 的 cacheRead 作为当前上下文大小
+          if (usage.cacheRead > tokens) {
+            tokens = usage.cacheRead;
+          }
         }
       } catch {}
     }
-    const totalBytes = Buffer.byteLength(content, 'utf-8');
-    const estimatedTokens = Math.round(chineseChars * 1.5 + asciiChars * 0.25);
-    return { chars: totalBytes, tokens: estimatedTokens, msgs: msgCount };
+
+    return { chars: 0, tokens, msgs: msgCount };
   } catch {
     return { chars: 0, tokens: 0, msgs: 0 };
   }

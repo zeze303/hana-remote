@@ -162,11 +162,11 @@ html, body {
 /* ── 文件树 ── */
 .file-tree {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   padding: 4px 0;
 }
 
-.file-tree::-webkit-scrollbar { width: 4px; }
+.file-tree::-webkit-scrollbar { width: 4px; height: 4px; }
 .file-tree::-webkit-scrollbar-track { background: transparent; }
 .file-tree::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
@@ -179,8 +179,6 @@ html, body {
   font-size: 13px;
   color: var(--text-dim);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   transition: 0.1s;
   position: relative;
 }
@@ -247,8 +245,6 @@ html, body {
 
 .tree-node .name {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .tree-children { display: none; }

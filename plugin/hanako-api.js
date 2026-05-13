@@ -180,9 +180,9 @@ class HanakoApi {
 
             case 'turn_end':
               // 不立即关闭，启动延迟定时器
-              // 如果 Hanako 还在用工具，后续会有更多 text_delta
+              // 如果 Hanako 还在用工具或生成下一段，后续会有更多内容
               clearGrace();
-              graceTimer = setTimeout(finalize, 10000);
+              graceTimer = setTimeout(finalize, 60000);
               break;
 
             case 'error':

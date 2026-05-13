@@ -206,7 +206,7 @@ class HanakoApi {
               // 不立即关闭，启动延迟定时器
               // 如果 Hanako 还在用工具或生成下一段，后续会有更多内容
               clearGrace();
-              graceTimer = setTimeout(finalize, 60000);
+              graceTimer = setTimeout(finalize, 180000);
               break;
 
             case 'error':
@@ -237,12 +237,12 @@ class HanakoApi {
         }
       });
 
-      // 超时保护（120 秒，给工具执行留足时间）
+      // 超时保护（5 分钟，给工具执行留足时间）
       setTimeout(() => {
         if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
           finalize();
         }
-      }, 120000);
+      }, 300000);
 
     } catch (e) {
       if (onError) onError(e);

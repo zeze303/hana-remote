@@ -53,5 +53,15 @@
     "type": "user",
     "text": "刚刚这一条消息又没有完全显示出来，还是超时了吧",
     "time": 1778687009981
+  },
+  {
+    "type": "hanako",
+    "text": "可能是 Hanako 服务端那边把空闲的 WebSocket 断开了。加上心跳保活：同时加个兜底——如果 WebSocket 异常断开（不是 `finalize` 触发的），也通知前端结束：`git pull` 重启插件试试。这次改了三个点：\n\n1. **每 15 秒发 ping**——Hanako 服务端如果因为空闲断开连接，会导致后续内容到不了前端\n2. **`finalized` 防重入**——防止 `finalize()` 和 `close` 事件同时触发 `onDone()` 两次\n3. **异常断开兜底**——如果 WS 被服务端断开（不是正常结束），也会通知前端结束，不会一直卡住\n\n加上之前的 60 秒 grace timer 和所有消息触发 clearGrace，应该能覆盖所有情况了。",
+    "time": 1778687097552
+  },
+  {
+    "type": "user",
+    "text": "把grace timer拉长到180秒吧",
+    "time": 1778687116839
   }
 ]

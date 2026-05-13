@@ -197,10 +197,10 @@
   let fileReadCallbacks = {};
   let fileWriteCallback = null;
 
-  function loadTree(path) {
+  function loadTree(path, level) {
     const id = sendMsg('file_tree', { path });
     if (id) {
-      treeMsgCallback = { id, path };
+      treeMsgCallback = { id, path, level: level || 0 };
     }
   }
 
@@ -224,20 +224,24 @@
     container.innerHTML = '';
     container.classList.add('open');
 
+    const parentLevel = treeMsgCallback ? (treeMsgCallback.level || 0) : 0;
     (payload.children || []).forEach(child => {
-      const node = createTreeNode(child, path);
+      const node = createTreeNode(child, payload.path || '', parentLevel + 1);
       container.appendChild(node);
     });
   }
 
-  function createTreeNode(item, parentPath) {
+  function createTreeNode(item, parentPath, level) {
+    level = level || 0;
     const fullPath = parentPath ? `${parentPath}${item.name}${item.type === 'dir' ? '\\' : ''}` : item.name;
+    const indent = 12 + level * 18;
     const div = document.createElement('div');
 
     if (item.type === 'dir' || item.isDrive) {
       // 目录/盘符
       const label = document.createElement('div');
       label.className = 'tree-node';
+      label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
 
       const chevron = document.createElement('span');
@@ -267,7 +271,7 @@
         } else {
           chevron.classList.add('expanded');
           if (childrenDiv.children.length === 0) {
-            loadTree(fullPath);
+            loadTree(fullPath, level + 1);
           }
           childrenDiv.classList.add('open');
         }
@@ -279,6 +283,7 @@
       // 文件
       const label = document.createElement('div');
       label.className = 'tree-node';
+      label.style.paddingLeft = indent + 'px';
       label.dataset.path = fullPath;
 
       const chevron = document.createElement('span');

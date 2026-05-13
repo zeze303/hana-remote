@@ -19,6 +19,7 @@
     treeExpanded: {},     // path → true/false
     sessions: [],         // { id, title, hanakoSessionPath, ... }
     activeSessionId: null,
+    _lastStatsMsgs: 0,  // 用于检测桌面端新增了消息
   };
 
   // ── DOM 引用 ──
@@ -1143,6 +1144,18 @@
   function updateSessionStats(payload) {
     if (!sessionStats) return;
     const { tokens, msgs } = payload || {};
+
+    // 检测消息数变化（桌面端新增了对话）→ 重新加载历史
+    if (msgs !== undefined && msgs !== state._lastStatsMsgs && state._lastStatsMsgs > 0) {
+      state._lastStatsMsgs = msgs;
+      // 不要重复切换自己
+      if (state.activeSessionId) {
+        sendMsg('chat_session_switch', { sessionId: state.activeSessionId });
+        return;
+      }
+    }
+    state._lastStatsMsgs = msgs || 0;
+
     if (tokens > 0) {
       const label = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : tokens;
       let dotClass;

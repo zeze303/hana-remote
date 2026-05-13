@@ -200,6 +200,7 @@ html, body {
 }
 .session-stats .stat-dot.ok { background: #22c55e; }
 .session-stats .stat-dot.warn { background: #eab308; }
+.session-stats .stat-dot.danger { background: #ef4444; }
 .icon-btn {
   background: none; border: none;
   color: var(--text-dim); cursor: pointer;

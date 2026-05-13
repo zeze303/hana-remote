@@ -1133,8 +1133,10 @@
     const { tokens, msgs } = payload || {};
     if (tokens > 0) {
       const label = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : tokens;
-      const pct = Math.min(100, Math.round(tokens / 32000 * 100));
-      const dotClass = pct > 70 ? 'warn' : 'ok';
+      let dotClass;
+      if (tokens < 100000) dotClass = 'ok';
+      else if (tokens < 500000) dotClass = 'warn';
+      else dotClass = 'danger';
       sessionStats.innerHTML = `<span class="stat-dot ${dotClass}"></span>${label} tokens · ${msgs} 条消息`;
     } else {
       sessionStats.innerHTML = '';

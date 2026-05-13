@@ -112,6 +112,7 @@ class HanakoApi {
 
       // 延迟完成定时器：收到 turn_end 后等多一会儿再关闭
       let graceTimer = null;
+      let finalized = false;
 
       function clearGrace() {
         if (graceTimer) {
@@ -121,6 +122,8 @@ class HanakoApi {
       }
 
       function finalize() {
+        if (finalized) return;
+        finalized = true;
         clearGrace();
         if (onDone) onDone();
         try { ws.close(); } catch {}
@@ -227,6 +230,11 @@ class HanakoApi {
         clearGrace();
         stopPing();
         this.ws = null;
+        // 如果非正常结束（不是 finalize 触发的），通知前端
+        if (!finalized) {
+          finalized = true;
+          if (onDone) onDone();
+        }
       });
 
       // 超时保护（120 秒，给工具执行留足时间）

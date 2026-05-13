@@ -203,6 +203,26 @@ class HanaRemotePlugin {
             this.wsClient.send({ id, ok: false, error: '没有可用会话' });
             break;
           }
+
+          // 拦截 /compact 命令，使用 WS compact 协议
+          const text = msg.payload?.text || '';
+          if (text.trim() === '/compact') {
+            console.log('[chat] 执行 /compact');
+            this.hanakoApi.compactSession(this.activeSessionPath, {
+              onDone: () => {
+                // 通知前端
+                this.wsClient.send({ id, ok: true, type: 'chat', payload: { text: '✅ 对话已压缩', done: false } });
+                this.wsClient.send({ id, ok: true, type: 'chat', payload: { text: '', done: true } });
+                // 刷新会话列表缓存
+                try { require('./handlers/session-manager').invalidateCache(); } catch {}
+              },
+              onError: (err) => {
+                this.wsClient.send({ id, ok: false, type: 'chat', payload: { error: `压缩失败: ${err.message}` } });
+              },
+            });
+            break;
+          }
+
           console.log(`[chat] 发送消息到会话: ${this.activeSessionPath.slice(0, 60)}...`);
           const enhancedPayload = { ...msg.payload, sessionPath: this.activeSessionPath };
           this.chatHandler.handle({ ...msg, payload: enhancedPayload });

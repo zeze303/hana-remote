@@ -256,4 +256,57 @@ class HanakoApi {
   }
 }
 
+  /**
+   * 发送压缩会话命令（而不是 prompt 文本）
+   * Hanako WS 协议接受 { type: "compact", sessionPath } 触发压缩
+   */
+  compactSession(sessionPath, callbacks = {}) {
+    const { onDone, onError } = callbacks;
+    if (!this.serverInfo) {
+      if (onError) onError(new Error('Hanako 未初始化'));
+      return;
+    }
+
+    this.sessionId = sessionPath;
+    const wsUrl = `ws://127.0.0.1:${this.serverInfo.port}/ws?token=${this.serverInfo.token}`;
+
+    try {
+      const ws = new WebSocket(wsUrl);
+      this.ws = ws;
+
+      ws.on('open', () => {
+        ws.send(JSON.stringify({ type: 'compact', sessionPath }));
+      });
+
+      ws.on('message', raw => {
+        try {
+          const msg = JSON.parse(raw.toString());
+          if (msg.type === 'error') {
+            if (onError) onError(new Error(msg.message || '压缩失败'));
+            ws.close();
+          } else if (msg.type === 'turn_end') {
+            if (onDone) onDone({ ok: true });
+            ws.close();
+          }
+        } catch {}
+      });
+
+      ws.on('error', err => {
+        if (onError) onError(err);
+      });
+
+      ws.on('close', () => { this.ws = null; });
+
+      setTimeout(() => {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+          if (onDone) onDone({ ok: true });
+        }
+      }, 30000);
+    } catch (e) {
+      if (onError) onError(e);
+    }
+  }
+}
+
 module.exports = { HanakoApi };

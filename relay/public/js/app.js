@@ -918,6 +918,7 @@
         if (lastMsg) lastMsg.dataset.done = 'true';
         clearChatMsgLock();
         chatInput.disabled = false;
+        setTimeout(requestSessionStats, 500);
       }
     }, 60000);
   }
@@ -1039,6 +1040,7 @@
     state.sessions = p.sessions || [];
     state.activeSessionId = p.active;
     renderSessionSelect(state.sessions, state.activeSessionId);
+    setTimeout(requestSessionStats, 200);
   }
 
   function handleSessionCreate(msg) {

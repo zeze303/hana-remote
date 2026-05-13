@@ -102,6 +102,10 @@
       if (msg.payload.workerOnline && fileTree.children.length < 2) {
         reloadTree();
       }
+      // 拉取聊天历史
+      if (msg.payload.workerOnline) {
+        setTimeout(requestChatHistory, 500);
+      }
       return;
     }
 
@@ -111,6 +115,8 @@
       disableChat(false);
       // 插件重连后自动刷新文件树
       reloadTree();
+      // 插件可能有新聊天记录
+      setTimeout(requestChatHistory, 500);
       return;
     }
 
@@ -188,6 +194,12 @@
         }
         showToast('✅ 已粘贴来自工作电脑的内容');
       }
+      return;
+    }
+
+    // 聊天历史回复
+    if (msg.type === 'chat_history' && msg.ok) {
+      handleChatHistoryResponse(msg);
       return;
     }
 
@@ -900,6 +912,30 @@
     lastMsg.textContent += p.text || '';
     chatMessages.scrollTop = chatMessages.scrollHeight;
     saveChatHistory();
+  }
+
+  function handleChatHistoryResponse(msg) {
+    const entries = msg.payload?.entries;
+    if (!entries || !Array.isArray(entries) || entries.length === 0) return;
+    // 已加载过 localStorage 历史，追加服务端历史中缺失的部分
+    const localCount = chatMessages.children.length;
+    const serverEntries = localCount > 0 ? entries.slice(-(entries.length - localCount)) : entries;
+    if (serverEntries.length === 0) return;
+    for (const entry of serverEntries) {
+      if (entry.type === 'thinking') {
+        const el = createThinkingBlock();
+        const pre = el.querySelector('pre');
+        if (pre) pre.textContent = entry.text || '';
+        chatMessages.appendChild(el);
+      } else {
+        addChatMsg(entry.type, entry.text || '');
+      }
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function requestChatHistory() {
+    sendMsg('chat_history', {});
   }
 
   function createThinkingBlock() {

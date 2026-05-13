@@ -5,6 +5,7 @@ const WsClient = require('./ws-client');
 const { handleFileTree, handleFileRead, handleFileWrite, handleFileStat, handleFileSearch } = require('./handlers/files');
 const { handleClipboardSet, handleClipboardGet } = require('./handlers/clipboard');
 const { createChatHandler } = require('./handlers/chat');
+const chatHistory = require('./handlers/chat-history');
 
 class HanaRemotePlugin {
   constructor(hanakoApi) {
@@ -23,9 +24,24 @@ class HanaRemotePlugin {
     // 创建 WebSocket 客户端
     this.wsClient = new WsClient({ relayUrl, workerSecret });
 
-    // 创建聊天处理器
+    // 聊天历史缓冲
+    let chatResponseBuffer = [];
+
+    // 创建聊天处理器（包装 sendToRelay 以记录历史）
     this.chatHandler = createChatHandler({
-      sendToRelay: (msg) => this.wsClient.send(msg),
+      sendToRelay: (msg) => {
+        // 缓冲 Hanako 回复文本
+        if (msg.type === 'chat' && msg.ok && msg.payload?.text && !msg.payload?.done) {
+          chatResponseBuffer.push(msg.payload.text);
+        }
+        // 回复完成时保存到历史
+        if (msg.type === 'chat' && msg.ok && msg.payload?.done) {
+          const fullText = chatResponseBuffer.join('');
+          if (fullText) chatHistory.addEntry('hanako', fullText);
+          chatResponseBuffer = [];
+        }
+        this.wsClient.send(msg);
+      },
       hanakoApi: this.hanakoApi,
     });
 
@@ -67,12 +83,27 @@ class HanaRemotePlugin {
     switch (type) {
       // 聊天
       case 'chat':
+        // 保存用户消息到历史
+        if (msg.payload?.text) {
+          chatHistory.addEntry('user', msg.payload.text);
+        }
         this.chatHandler.handle(msg);
         break;
 
       // 取消聊天
       case 'chat_cancel':
         this.chatHandler.cancel();
+        break;
+
+      // 获取聊天历史
+      case 'chat_history':
+        this.wsClient.send({ id, ok: true, type, payload: { entries: chatHistory.loadHistory() } });
+        break;
+
+      // 清空聊天历史
+      case 'chat_history_clear':
+        chatHistory.clearHistory();
+        this.wsClient.send({ id, ok: true, type, payload: { ok: true } });
         break;
 
       // 文件操作

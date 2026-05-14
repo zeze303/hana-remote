@@ -1,0 +1,7 @@
+tunnel: hana-remote
+credentials-file: C:\Users\19133\.cloudflared\hana-remote.json
+
+ingress:
+  - hostname: hanako.13701.top
+    service: http://localhost:3456
+  - service: http_status:404
